@@ -1,0 +1,5 @@
+allow_unlicensed: true
+port: 25565
+server_motd: "Hello, World!"
+max_players: 200
+server_icon_path: "image.jpg"
