@@ -397,7 +397,7 @@ func sendChunk(conn base.Connection, x, z int, maxChunksCount int) int {
 				continue
 			}
 			chunksToSend = append(chunksToSend, client_packet.PacketOLevelChunkWithLightFake{
-				Data: CreateChunk(x+i, z+j),
+				Data: _CreateChunk(x+i, z+j),
 			})
 			sendedChunks[key] = true
 			conn.Profile().SendedChunks = sendedChunks
