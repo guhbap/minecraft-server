@@ -174,6 +174,7 @@ func (s *server) broadcastCommand(sender ents.Sender, params []string) {
 
 	for _, player := range s.Players() {
 		player.SendMessage(message)
+
 	}
 }
 

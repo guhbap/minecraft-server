@@ -4,6 +4,7 @@ import (
 	"github.com/golangmc/minecraft-server/apis/ents"
 	"github.com/golangmc/minecraft-server/apis/game"
 
+	"github.com/golangmc/minecraft-server/impl/base"
 	impl_base "github.com/golangmc/minecraft-server/impl/base"
 )
 
@@ -31,6 +32,10 @@ func NewPlayer(prof *game.Profile, conn impl_base.Connection) ents.Player {
 	player.SetConn(conn)
 
 	return player
+}
+
+func (p *player) SendPlayerPacket(packet any) {
+	p.conn.SendPacket(packet.(base.PacketO))
 }
 
 // func (p *player) SendMessage(message ...interface{}) {

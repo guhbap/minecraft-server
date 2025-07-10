@@ -45,6 +45,14 @@ func HandleState2(watcher util.Watcher, serverInfo *conf.ServerInfo) {
 				Name:           packet.PlayerName,
 				MaxChunksCount: 9,
 				SendedChunks:   make(map[string]bool),
+				PosInfo: game.PosInfo{
+					X:     0,
+					Y:     0,
+					Z:     0,
+					Yaw:   0,
+					Pitch: 0,
+				},
+				OtherData: make(map[string]any),
 			}
 
 			player := ents.NewPlayer(&prof, conn)
@@ -106,6 +114,14 @@ func HandleState2(watcher util.Watcher, serverInfo *conf.ServerInfo) {
 				Name:           auth.Name,
 				MaxChunksCount: 9,
 				SendedChunks:   make(map[string]bool),
+				PosInfo: game.PosInfo{
+					X:     0,
+					Y:     0,
+					Z:     0,
+					Yaw:   0,
+					Pitch: 0,
+				},
+				OtherData: make(map[string]any),
 			}
 
 			for _, prop := range auth.Prop {
@@ -118,9 +134,20 @@ func HandleState2(watcher util.Watcher, serverInfo *conf.ServerInfo) {
 
 			player := ents.NewPlayer(&prof, conn)
 
+			props := make([]client.Property, len(prof.Properties))
+			for i, prop := range prof.Properties {
+				props[i] = client.Property{
+					Name:      prop.Name,
+					Value:     prop.Value,
+					Signature: prop.Signature,
+				}
+			}
+			fmt.Println("properties", props)
+
 			conn.SendPacket(&client.PacketOLoginSuccess{
 				PlayerName: player.Name(),
 				PlayerUUID: player.UUID(),
+				Properties: props,
 			})
 			conn.SetProfile(&prof)
 

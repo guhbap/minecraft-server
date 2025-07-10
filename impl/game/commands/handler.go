@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strconv"
 
+	"github.com/golangmc/minecraft-server/apis/buff"
 	"github.com/golangmc/minecraft-server/apis/data"
 	"github.com/golangmc/minecraft-server/impl/base"
 	"github.com/golangmc/minecraft-server/impl/data/client"
@@ -27,6 +28,14 @@ func CommandHandler(packet *server_packet.PacketIChatCommand, conn base.Connecti
 				Overlay: false,
 			})
 		}
+	case "spawn":
+		err := SpawnEntity(conn, args)
+		if err != nil {
+			conn.SendPacket(&client_packet.PacketOSystemChat{
+				Message: err.Error(),
+				Overlay: false,
+			})
+		}
 	}
 }
 
@@ -35,6 +44,14 @@ var gamemodes = map[string]int{
 	"creative":  1,
 	"adventure": 2,
 	"spectator": 3,
+}
+
+func SpawnEntity(conn base.Connection, args []string) error {
+	if len(args) < 3 {
+		return errors.New("not enough arguments")
+	}
+
+	return nil
 }
 
 func GameModeCommand(args []string, conn base.Connection) error {
@@ -59,11 +76,22 @@ func GameModeCommand(args []string, conn base.Connection) error {
 				FlyingSpeed: 0.05,
 				FieldOfView: 0.1,
 			})
+		properties := make([]client_packet.Property, len(conn.Profile().Properties))
+		for i, prop := range conn.Profile().Properties {
+			properties[i] = client_packet.Property{
+				Name:      prop.Name,
+				Value:     prop.Value,
+				Signature: prop.Signature,
+			}
+		}
 		conn.SendPacket(&client_packet.PacketOPlayerInfoUpdate{
-			Actions: client.UpdateGameMode,
-			Players: []client_packet.PlayerInfoUpdatePlayers{
+			Actions: 0x01,
+			Players: []client_packet.PlayerInfoUpdatePlayer{
 				{
 					UUID: conn.Profile().UUID,
+					Actions: []func(buff.Buffer){
+						client_packet.ADD_PLAYER_ACTION(conn.Profile().Name, properties),
+					},
 				},
 			},
 		})
@@ -81,8 +109,8 @@ func GameModeCommand(args []string, conn base.Connection) error {
 				FieldOfView: 0.1,
 			})
 		conn.SendPacket(&client_packet.PacketOSetEntityMetadata{
-			EntityID: int32(conn.Profile().EntityID),
-			Metadata: []byte{0, 0, 32, 255},
+			EntityID: int32(conn.Profile().EntityID), // todo
+			// Metadata: []byte{0, 0, 32, 255},
 		})
 		conn.SendPacket(&client_packet.PacketOUpdateAttributes{
 			EntityID: int32(conn.Profile().EntityID),

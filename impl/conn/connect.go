@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 
 	"github.com/golangmc/minecraft-server/apis/game"
 	"github.com/golangmc/minecraft-server/apis/rand"
@@ -167,8 +168,11 @@ func (c *connection) Stop() (err error) {
 }
 
 func (c *connection) SendPacket(packet base.PacketO) {
+	silentkList := []int32{0x20, 0x4D, 0x28, 0x0d, 0x0c}
+	if !slices.Contains(silentkList, packet.UUID()) {
+		fmt.Printf("sending packet: 0x%02x\n", packet.UUID())
+	}
 
-	fmt.Printf("sending packet: 0x%02x\n", packet.UUID())
 	bufO := NewBuffer()
 	temp := NewBuffer()
 

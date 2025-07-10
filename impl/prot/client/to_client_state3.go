@@ -13,6 +13,8 @@ import (
 	"github.com/golangmc/minecraft-server/impl/base"
 	"github.com/golangmc/minecraft-server/impl/data/client"
 	"github.com/golangmc/minecraft-server/impl/data/plugin"
+	"github.com/golangmc/minecraft-server/impl/prot/subtypes"
+	"github.com/golangmc/minecraft-server/impl/prot/subtypes/entityMetadata"
 )
 
 type PacketOChatMessage struct {
@@ -354,7 +356,7 @@ func (p *PacketOEntityEvent) Push(writer buff.Buffer, conn base.Connection) {
 
 type PacketOSetEntityMetadata struct {
 	EntityID int32
-	Metadata []byte
+	Metadata []entityMetadata.EntityField
 }
 
 func (p *PacketOSetEntityMetadata) UUID() int32 {
@@ -363,7 +365,10 @@ func (p *PacketOSetEntityMetadata) UUID() int32 {
 
 func (p *PacketOSetEntityMetadata) Push(writer buff.Buffer, conn base.Connection) {
 	writer.PushVrI(p.EntityID)
-	writer.PushUAS(p.Metadata, false)
+	for _, field := range p.Metadata {
+		field.Push(writer)
+	}
+	writer.PushByt(0xFF)
 }
 
 type LightData struct {
@@ -604,17 +609,81 @@ func (p *PacketOSetChunkCacheCenter) Push(writer buff.Buffer, conn base.Connecti
 	writer.PushVrI(p.Z)
 }
 
-type PlayerInfoUpdatePlayers struct {
-	UUID uuid.UUID
+type PlayerInfoActionInstance []byte
+
+type PlayerInfoUpdatePlayer struct {
+	UUID    uuid.UUID
+	Actions []func(buff.Buffer)
 }
 
-func (p *PlayerInfoUpdatePlayers) Push(writer buff.Buffer) {
+func ADD_PLAYER_ACTION(name string, properties []Property) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		writer.PushTxt(name)
+		writer.PushVrI(int32(len(properties)))
+		for _, property := range properties {
+			writer.PushTxt(property.Name)
+			writer.PushTxt(property.Value)
+			if property.Signature != nil {
+				writer.PushBit(true)
+				writer.PushTxt(*property.Signature)
+			} else {
+				writer.PushBit(false)
+			}
+		}
+	}
+}
+func INITIALIZE_CHAT(ChatSessionID uuid.UUID) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		writer.PushByt(0)
+	}
+}
+
+func UPDATE_GAME_MODE(GameMode int) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		writer.PushByt(byte(GameMode))
+	}
+}
+func UPDATE_LISTED(Listed bool) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		writer.PushBit(Listed)
+	}
+}
+func UPDATE_LATENCY(Latency int32) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		writer.PushVrI(Latency)
+	}
+}
+func UPDATE_DISPLAY_NAME(DisplayName string) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		msg := NbtTextMessage{
+			Text: DisplayName,
+		}
+		writer.PushByt(1)
+		msg.Push(writer)
+	}
+}
+
+func UPDATE_LIST_PRIORITY(ListPriority int32) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		writer.PushVrI(ListPriority)
+	}
+}
+func UPDATE_HAT(Hat bool) func(buff.Buffer) {
+	return func(writer buff.Buffer) {
+		writer.PushBit(Hat)
+	}
+}
+
+func (p *PlayerInfoUpdatePlayer) Push(writer buff.Buffer) {
 	writer.PushUID(p.UUID)
+	for _, action := range p.Actions {
+		action(writer)
+	}
 }
 
 type PacketOPlayerInfoUpdate struct {
 	Actions byte
-	Players []PlayerInfoUpdatePlayers
+	Players []PlayerInfoUpdatePlayer
 }
 
 func (p *PacketOPlayerInfoUpdate) UUID() int32 {
@@ -663,4 +732,93 @@ func (p *NbtTextMessage) Push(writer buff.Buffer) {
 		panic(err)
 	}
 	writer.PushUAS(buf.Bytes(), false)
+}
+
+type PacketOBundle struct {
+}
+
+func (p *PacketOBundle) UUID() int32 {
+	return 0x00
+}
+
+func (p *PacketOBundle) Push(writer buff.Buffer, conn base.Connection) {}
+
+type PacketOMoveEntityPos struct {
+	EntityID int32
+	DeltaX   int16
+	DeltaY   int16
+	DeltaZ   int16
+	OnGround bool
+}
+
+func (p *PacketOMoveEntityPos) UUID() int32 {
+	return 0x2f
+}
+func (p *PacketOMoveEntityPos) Push(writer buff.Buffer, conn base.Connection) {
+	writer.PushVrI(p.EntityID)
+	writer.PushI16(p.DeltaX)
+	writer.PushI16(p.DeltaY)
+	writer.PushI16(p.DeltaZ)
+	writer.PushBit(p.OnGround)
+}
+
+type PacketORotateHead struct {
+	EntityID int32
+	Yaw      subtypes.Angle
+}
+
+func (p *PacketORotateHead) UUID() int32 {
+	return 0x4D
+}
+
+func (p *PacketORotateHead) Push(writer buff.Buffer, conn base.Connection) {
+	writer.PushVrI(p.EntityID)
+	p.Yaw.Push(writer)
+}
+
+type PacketOMoveEntityRot struct {
+	EntityID int32
+	Yaw      subtypes.Angle
+	Pitch    subtypes.Angle
+	OnGround bool
+}
+
+func (p *PacketOMoveEntityRot) UUID() int32 {
+	return 0x32
+}
+func (p *PacketOMoveEntityRot) Push(writer buff.Buffer, conn base.Connection) {
+	writer.PushVrI(p.EntityID)
+	p.Yaw.Push(writer)
+	p.Pitch.Push(writer)
+	writer.PushBit(p.OnGround)
+}
+
+type PacketOEntityPositionSync struct {
+	EntityID int32
+	X        float64
+	Y        float64
+	Z        float64
+	VelX     float64
+	VelY     float64
+	VelZ     float64
+	Yaw      float32
+	Pitch    float32
+	OnGround bool
+}
+
+func (p *PacketOEntityPositionSync) UUID() int32 {
+	return 0x20
+}
+
+func (p *PacketOEntityPositionSync) Push(writer buff.Buffer, conn base.Connection) {
+	writer.PushVrI(p.EntityID)
+	writer.PushF64(p.X)
+	writer.PushF64(p.Y)
+	writer.PushF64(p.Z)
+	writer.PushF64(p.VelX)
+	writer.PushF64(p.VelY)
+	writer.PushF64(p.VelZ)
+	writer.PushF32(p.Yaw)
+	writer.PushF32(p.Pitch)
+	writer.PushBit(p.OnGround)
 }

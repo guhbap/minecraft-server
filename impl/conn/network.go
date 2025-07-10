@@ -154,7 +154,7 @@ func handleReceive(network *network, conn base.Connection, bufI buff.Buffer) {
 		network.logger.DataF("unable to decode %v packet with uuid: 0x%02x", conn.GetState(), uuid)
 		return
 	}
-	silentkList := []int32{0x0b, 0x1c, 0x1e, 0x1d}
+	silentkList := []int32{0x0b, 0x1c, 0x1d, 0x1e, 0x09}
 
 	if !slices.Contains(silentkList, uuid) {
 		network.logger.DataF("GET packet: 0x%02x %d | %v | %v", packetI.UUID(), uuid, reflect.TypeOf(packetI), conn.GetState())

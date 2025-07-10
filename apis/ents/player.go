@@ -12,4 +12,5 @@ type Player interface {
 	SetIsOnline(state bool)
 
 	GetProfile() *game.Profile
+	SendPlayerPacket(packet any)
 }

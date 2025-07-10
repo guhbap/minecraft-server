@@ -236,6 +236,21 @@ func (p *PacketIMovePlayerPosRot) Pull(reader buff.Buffer, conn base.Connection)
 	p.Flags = reader.PullByt()
 }
 
+// type PacketIMovePlayerRot struct {
+// 	Yaw   float32
+// 	Pitch float32
+// 	Flags byte
+// }
+
+// func (p *PacketIMovePlayerRot) UUID() int32 {
+// 	return 0x1e
+// }
+// func (p *PacketIMovePlayerRot) Pull(reader buff.Buffer, conn base.Connection) {
+// 	p.Yaw = reader.PullF32()
+// 	p.Pitch = reader.PullF32()
+// 	p.Flags = reader.PullByt()
+// }
+
 type PacketIMovePlayerPos struct {
 	Position data.PositionF
 	Flags    byte
@@ -341,4 +356,15 @@ func (p *PacketIBundleDelimiter) UUID() int32 {
 }
 
 func (p *PacketIBundleDelimiter) Pull(reader buff.Buffer, conn base.Connection) {
+}
+
+type PacketIChunkBatchReceived struct {
+	ChunkOnTick float32
+}
+
+func (p *PacketIChunkBatchReceived) UUID() int32 {
+	return 0x09
+}
+func (p *PacketIChunkBatchReceived) Pull(reader buff.Buffer, conn base.Connection) {
+	p.ChunkOnTick = reader.PullF32()
 }

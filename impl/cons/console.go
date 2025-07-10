@@ -38,6 +38,10 @@ func NewConsole(report chan system.Message) *Console {
 	return console
 }
 
+func (c *Console) SendPlayerPacket(packet any) {
+	c.logger.InfoF("sending packet to console: %v", packet)
+}
+
 func (c *Console) Load() {
 	// handle i channel
 	go func() {

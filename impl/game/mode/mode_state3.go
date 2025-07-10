@@ -2,13 +2,18 @@ package mode
 
 import (
 	"fmt"
+	"math/rand"
+	"slices"
 	"time"
 
 	"github.com/golangmc/minecraft-server/apis"
+	"github.com/golangmc/minecraft-server/apis/buff"
+	"github.com/golangmc/minecraft-server/apis/data"
 	"github.com/golangmc/minecraft-server/apis/game"
 	"github.com/golangmc/minecraft-server/apis/logs"
 	"github.com/golangmc/minecraft-server/apis/task"
 	"github.com/golangmc/minecraft-server/apis/util"
+	"github.com/golangmc/minecraft-server/apis/uuid"
 	"github.com/golangmc/minecraft-server/impl/base"
 	"github.com/golangmc/minecraft-server/impl/conf"
 	"github.com/golangmc/minecraft-server/impl/data/values"
@@ -17,7 +22,10 @@ import (
 	impl_event "github.com/golangmc/minecraft-server/impl/game/event"
 
 	client_packet "github.com/golangmc/minecraft-server/impl/prot/client"
+	stateplay "github.com/golangmc/minecraft-server/impl/prot/client/statePlay"
 	server_packet "github.com/golangmc/minecraft-server/impl/prot/server"
+	"github.com/golangmc/minecraft-server/impl/prot/subtypes"
+	"github.com/golangmc/minecraft-server/impl/prot/subtypes/entityMetadata"
 )
 
 func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Tasking, join chan base.PlayerAndConnection, quit chan base.PlayerAndConnection, serverInfo *conf.ServerInfo) {
@@ -75,16 +83,76 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 	})
 
 	watcher.SubAs(func(packet *server_packet.PacketIMovePlayerPos, conn base.Connection) {
-		res := sendChunk(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount)
-		if res > 0 {
-			fmt.Println("sent chunks", res)
+		sendChunk(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount)
+		if packet.Position.Y < -100 {
+			conn.SendPacket(&client_packet.PacketOPlayerPosition{
+				TpId:     int32(rand.Intn(1000000)),
+				Position: data.PositionF{X: packet.Position.X, Y: 10, Z: packet.Position.Z},
+				Speed:    data.PositionF{X: 0, Y: 0, Z: 0},
+				Yaw:      0,
+				Pitch:    0,
+				Flags:    0,
+			})
 		}
+		conn.Profile().UpdatePos(packet.Position.X, packet.Position.Y, packet.Position.Z)
+		BroadcastPacket(serverInfo, &client_packet.PacketOEntityPositionSync{
+			EntityID: int32(conn.Profile().EntityID),
+			X:        packet.Position.X,
+			Y:        packet.Position.Y,
+			Z:        packet.Position.Z,
+			VelX:     0,
+			VelY:     0,
+			VelZ:     0,
+			Yaw:      conn.Profile().GetPosInfo().Yaw,
+			Pitch:    conn.Profile().GetPosInfo().Pitch,
+			OnGround: true,
+		}, conn.Profile().UUID)
+	})
+	watcher.SubAs(func(packet *server_packet.PacketIMovePlayerRot, conn base.Connection) {
+		// conn.Profile().UpdateYawPitch(packet.Yaw, packet.Pitch)
+
+		// BroadcastPacket(serverInfo, &client_packet.PacketOMoveEntityRot{
+		// 	EntityID: int32(conn.Profile().EntityID),
+		// 	Yaw:      subtypes.Angle(packet.Yaw),
+		// 	Pitch:    subtypes.Angle(packet.Pitch),
+		// 	OnGround: packet.Flags&0x01 != 0,
+		// }, conn.Profile().UUID)
+		// из значений от 0 до 360 в значение от 0 до 255
+		yaw := float32(packet.Yaw) / 360 * 255
+		BroadcastPacket(serverInfo, &client_packet.PacketORotateHead{
+			EntityID: int32(conn.Profile().EntityID),
+			Yaw:      subtypes.Angle(yaw),
+		}, conn.Profile().UUID)
+		conn.Profile().UpdateYawPitch(float32(packet.Yaw), float32(packet.Pitch))
+		BroadcastPacket(serverInfo, &client_packet.PacketOEntityPositionSync{
+			EntityID: int32(conn.Profile().EntityID),
+			X:        conn.Profile().GetPosInfo().X,
+			Y:        conn.Profile().GetPosInfo().Y,
+			Z:        conn.Profile().GetPosInfo().Z,
+			VelX:     0,
+			VelY:     0,
+			VelZ:     0,
+			Yaw:      conn.Profile().GetPosInfo().Yaw,
+			Pitch:    conn.Profile().GetPosInfo().Pitch,
+			OnGround: true,
+		}, conn.Profile().UUID)
 	})
 	watcher.SubAs(func(packet *server_packet.PacketIMovePlayerPosRot, conn base.Connection) {
-		res := sendChunk(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount)
-		if res > 0 {
-			fmt.Println("sent chunks", res)
-		}
+		sendChunk(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount)
+		conn.Profile().UpdatePos(packet.Position.X, packet.Position.Y, packet.Position.Z)
+		conn.Profile().UpdateYawPitch(float32(packet.Rotation.AxisX), float32(packet.Rotation.AxisY))
+		BroadcastPacket(serverInfo, &client_packet.PacketOEntityPositionSync{
+			EntityID: int32(conn.Profile().EntityID),
+			X:        conn.Profile().GetPosInfo().X,
+			Y:        conn.Profile().GetPosInfo().Y,
+			Z:        conn.Profile().GetPosInfo().Z,
+			VelX:     0,
+			VelY:     0,
+			VelZ:     0,
+			Yaw:      conn.Profile().GetPosInfo().Yaw,
+			Pitch:    conn.Profile().GetPosInfo().Pitch,
+			OnGround: true,
+		}, conn.Profile().UUID)
 	})
 
 	watcher.SubAs(func(packet *server_packet.PacketIPlayerLoaded, conn base.Connection) {
@@ -109,11 +177,11 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				PortalCooldown:     0,
 				SeaLevel:           64,
 				EnforceSecureChat:  true,
-				PreviousGameMode:   game.SPECTATOR,
+				PreviousGameMode:   0xff,
 				IsDebug:            false,
 				IsFlat:             false,
 				HasDeathLocation:   false,
-				GameMode:           game.SPECTATOR,
+				GameMode:           game.CREATIVE,
 				DimensionNames:     []string{"minecraft:overworld"},
 				HashedSeed:         values.DefaultWorldHashedSeed,
 				MaxPlayers:         10,
@@ -145,16 +213,108 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				WarningBlocks:          5,
 				WarningTime:            15,
 			})
+			conn.SendPacket(&client_packet.PacketOPlayerPosition{
+				TpId:     int32(rand.Intn(1000000)),
+				Position: data.PositionF{X: float64(7), Y: float64(-55), Z: float64(9)},
+				Speed:    data.PositionF{X: 0, Y: 0, Z: 0},
+				Yaw:      0,
+				Pitch:    0,
+				Flags:    0,
+			})
+
+			player := conf.PlayerData{
+				UUID:      conn.Profile().UUID,
+				Name:      conn.Profile().Name,
+				EntityID:  int32(conn.Profile().EntityID),
+				OtherData: make(map[string]any),
+			}
+
+			properties := make([]client_packet.Property, len(prof.Properties))
+
+			for i, prop := range prof.Properties {
+				properties[i] = client_packet.Property{
+					Name:      prop.Name,
+					Value:     prop.Value,
+					Signature: prop.Signature,
+				}
+			}
+			playerInfoPacket := &client_packet.PacketOPlayerInfoUpdate{
+				Actions: 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x40 | 0x80,
+				Players: []client_packet.PlayerInfoUpdatePlayer{
+					{
+						UUID: player.UUID,
+						Actions: []func(buff.Buffer){
+							client_packet.ADD_PLAYER_ACTION(player.Name, properties),
+							client_packet.INITIALIZE_CHAT(player.UUID),
+							client_packet.UPDATE_GAME_MODE(1),
+							client_packet.UPDATE_LISTED(true),
+							client_packet.UPDATE_LATENCY(0),
+							client_packet.UPDATE_DISPLAY_NAME(player.Name),
+							client_packet.UPDATE_LIST_PRIORITY(0),
+							client_packet.UPDATE_HAT(false),
+						},
+					},
+				},
+			}
+
+			addEntityPacket := &stateplay.PacketOAddEntity{
+				EntityID:   player.EntityID,
+				EntityUUID: player.UUID,
+				Type:       subtypes.EntityTypesRegistry["minecraft:player"].Index,
+				X:          7,
+				Y:          -55,
+				Z:          9,
+				Pitch:      0,
+				Yaw:        0,
+				HeadYaw:    0,
+				Data:       0,
+				VelocityX:  0,
+				VelocityY:  0,
+				VelocityZ:  0,
+			}
+			conn.SendPacket(playerInfoPacket)
+			serverInfo.DynamicServerInfo.Players[conn.Profile().UUID.String()] = &player
+			player.OtherData["playerInfoPacket"] = playerInfoPacket
+			player.OtherData["addEntityPacket"] = addEntityPacket
+			for _, player := range serverInfo.DynamicServerInfo.Players {
+				if player.UUID == conn.Profile().UUID {
+					continue
+				}
+				packet, ok := player.OtherData["playerInfoPacket"].(*client_packet.PacketOPlayerInfoUpdate)
+				if !ok {
+					continue
+				}
+				fmt.Println("sending packet about", player.Name)
+				conn.SendPacket(packet)
+				conn.SendPacket(&client_packet.PacketOBundle{})
+
+				packet2, ok := player.OtherData["addEntityPacket"].(*stateplay.PacketOAddEntity)
+				if !ok {
+					continue
+				}
+				conn.SendPacket(packet2)
+				conn.SendPacket(&client_packet.PacketOBundle{})
+			}
+
+			BroadcastAddPlayer(serverInfo, &player)
 			conn.SendPacket(&client_packet.PacketOGameEvent{EventID: 13, Data: 0.0})
 
 			conn.SendPacket(&client_packet.PacketOSetChunkCacheCenter{
 				X: 0,
 				Z: 0,
 			})
+
+			ef := entityMetadata.GetLivingEntityFields()
+			ef.Health.Value = float32(20.0)
+			pf := entityMetadata.GetPlayerFields()
+			pf.TheDisplayedSkinPartsBitMaskThat.Value = byte(0)
 			conn.SendPacket(
 				&client_packet.PacketOSetEntityMetadata{
 					EntityID: int32(conn.Profile().EntityID),
-					Metadata: []byte{9, 3, 0x41, 0xa0, 0, 0, 0x11, 0, 0x7f, 0xff},
+					Metadata: []entityMetadata.EntityField{
+						ef.Health,
+						pf.TheDisplayedSkinPartsBitMaskThat,
+					},
 				},
 			)
 			conn.SendPacket(&client_packet.PacketOUpdateAttributes{
@@ -175,6 +335,10 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 						Modifiers: []client_packet.ModifierData{},
 					},
 				},
+			})
+			BroadcastPacket(serverInfo, &client_packet.PacketOSystemChat{
+				Message: fmt.Sprintf("player %s joined the game", conn.Profile().Name),
+				Overlay: false,
 			})
 
 			// conn.SendPacket(&client_packet.PacketOPlayerInfoUpdate{
@@ -198,6 +362,13 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 			if conn.Profile() != nil {
 				fmt.Println("player quit", conn.Profile().UUID.String())
 				delete(serverInfo.DynamicServerInfo.Online, conn.Profile().UUID.String())
+				delete(serverInfo.DynamicServerInfo.Players, conn.Profile().UUID.String())
+				BroadcastPacket(serverInfo, &stateplay.PacketORemoveEntity{
+					EntityIDs: []int32{conn.Profile().EntityID},
+				})
+				BroadcastPacket(serverInfo, &stateplay.PacketOPlayerInfoRemove{
+					UUIDs: []uuid.UUID{conn.Profile().UUID},
+				})
 			}
 		}
 	}()
@@ -228,7 +399,6 @@ func sendChunk(conn base.Connection, x, z int, maxChunksCount int) int {
 			chunksToSend = append(chunksToSend, client_packet.PacketOLevelChunkWithLightFake{
 				Data: CreateChunk(x+i, z+j),
 			})
-			fmt.Println("sending chunk", key)
 			sendedChunks[key] = true
 			conn.Profile().SendedChunks = sendedChunks
 			if len(chunksToSend) >= maxChunksCount {
@@ -246,4 +416,54 @@ func sendChunk(conn base.Connection, x, z int, maxChunksCount int) int {
 		})
 	}
 	return len(chunksToSend)
+}
+
+func BroadcastPacket(serverInfo *conf.ServerInfo, packet base.PacketO, exclude ...uuid.UUID) {
+	for _, player := range serverInfo.DynamicServerInfo.Online {
+		uuid, err := uuid.TextToUUID(player.ID)
+		if err != nil {
+			continue
+		}
+		if slices.Contains(exclude, uuid) {
+			continue
+		}
+		conn := apis.MinecraftServer().ConnByUUID(uuid)
+		if conn != nil {
+			conn.SendPacket(packet)
+		}
+	}
+}
+
+func BroadcastAddPlayer(serverInfo *conf.ServerInfo, player *conf.PlayerData) {
+	playerInfoPacket, ok := player.OtherData["playerInfoPacket"].(*client_packet.PacketOPlayerInfoUpdate)
+	if !ok {
+		return
+	}
+	addEntityPacket, ok := player.OtherData["addEntityPacket"].(*stateplay.PacketOAddEntity)
+	if !ok {
+		return
+	}
+	BroadcastPacket(serverInfo, playerInfoPacket, player.UUID)
+
+	BroadcastPacket(serverInfo, &client_packet.PacketOBundle{}, player.UUID)
+	BroadcastPacket(serverInfo, addEntityPacket, player.UUID)
+	lf := entityMetadata.GetLivingEntityFields()
+	lf.Health.Value = float32(20)
+	pf := entityMetadata.GetPlayerFields()
+	pf.TheDisplayedSkinPartsBitMaskThat.Value = byte(127)
+	BroadcastPacket(serverInfo, &client_packet.PacketOSetEntityMetadata{
+		EntityID: player.EntityID,
+		Metadata: []entityMetadata.EntityField{
+			lf.Health,
+			pf.TheDisplayedSkinPartsBitMaskThat,
+		},
+	}, player.UUID)
+	BroadcastPacket(serverInfo, &client_packet.PacketOBundle{}, player.UUID)
+	BroadcastPacket(serverInfo, &client_packet.PacketOMoveEntityPos{
+		EntityID: player.EntityID,
+		DeltaX:   0,
+		DeltaY:   0,
+		DeltaZ:   0,
+		OnGround: true,
+	}, player.UUID)
 }

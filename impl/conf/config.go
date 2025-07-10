@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/disintegration/imaging"
+	"github.com/golangmc/minecraft-server/apis/uuid"
 	"gopkg.in/yaml.v2"
 )
 
@@ -73,15 +74,24 @@ type SamplePlayer struct {
 	ID   string `json:"id"`
 }
 
+type PlayerData struct {
+	UUID      uuid.UUID
+	Name      string
+	EntityID  int32
+	OtherData map[string]any
+}
+
 type DynamicServerInfo struct {
 	ServerMotd string
 	Online     map[string]SamplePlayer
+	Players    map[string]*PlayerData
 }
 
 func NewDynamicServerInfo(serverMotd string, online []SamplePlayer) *DynamicServerInfo {
 	return &DynamicServerInfo{
 		ServerMotd: serverMotd,
 		Online:     make(map[string]SamplePlayer),
+		Players:    make(map[string]*PlayerData),
 	}
 }
 

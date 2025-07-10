@@ -8,4 +8,5 @@ type Sender interface {
 	base.Named
 
 	SendMessage(message ...interface{})
+	SendPlayerPacket(packet any)
 }

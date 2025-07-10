@@ -41,9 +41,16 @@ func (p *PacketOEncryptionRequest) Push(writer buff.Buffer, conn base.Connection
 	writer.PushBit(p.ShouldAuth)
 }
 
+type Property struct {
+	Name      string
+	Value     string
+	Signature *string
+}
+
 type PacketOLoginSuccess struct {
 	PlayerUUID uuid.UUID
 	PlayerName string
+	Properties []Property
 }
 
 func (p *PacketOLoginSuccess) UUID() int32 {
@@ -53,7 +60,17 @@ func (p *PacketOLoginSuccess) UUID() int32 {
 func (p *PacketOLoginSuccess) Push(writer buff.Buffer, conn base.Connection) {
 	writer.PushUID(p.PlayerUUID)
 	writer.PushTxt(p.PlayerName)
-	writer.PushUAS([]byte{0}, false)
+	writer.PushVrI(int32(len(p.Properties)))
+	for _, property := range p.Properties {
+		writer.PushTxt(property.Name)
+		writer.PushTxt(property.Value)
+		if property.Signature != nil {
+			writer.PushBit(true)
+			writer.PushTxt(*property.Signature)
+		} else {
+			writer.PushBit(false)
+		}
+	}
 }
 
 type PacketOSetCompression struct {

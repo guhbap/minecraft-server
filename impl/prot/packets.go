@@ -97,6 +97,9 @@ func createPacketI() map[base.PacketState]map[int32]func() base.PacketI {
 			0x08: func() base.PacketI {
 				return &server.PacketIChatSessionUpdate{}
 			},
+			0x09: func() base.PacketI {
+				return &server.PacketIChunkBatchReceived{}
+			},
 			0x0B: func() base.PacketI {
 				return &server.PacketIClientTickEnd{}
 			},
