@@ -18,6 +18,7 @@ import (
 	"github.com/golangmc/minecraft-server/impl/conf"
 	"github.com/golangmc/minecraft-server/impl/data/values"
 
+	"github.com/golangmc/minecraft-server/impl/game/chunk_utils"
 	"github.com/golangmc/minecraft-server/impl/game/commands"
 	impl_event "github.com/golangmc/minecraft-server/impl/game/event"
 
@@ -215,7 +216,7 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 			})
 			conn.SendPacket(&client_packet.PacketOPlayerPosition{
 				TpId:     int32(rand.Intn(1000000)),
-				Position: data.PositionF{X: float64(7), Y: float64(-55), Z: float64(9)},
+				Position: data.PositionF{X: 0, Y: 200, Z: 0},
 				Speed:    data.PositionF{X: 0, Y: 0, Z: 0},
 				Yaw:      0,
 				Pitch:    0,
@@ -261,9 +262,9 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				EntityID:   player.EntityID,
 				EntityUUID: player.UUID,
 				Type:       subtypes.EntityTypesRegistry["minecraft:player"].Index,
-				X:          7,
-				Y:          -55,
-				Z:          9,
+				X:          0,
+				Y:          200,
+				Z:          0,
 				Pitch:      0,
 				Yaw:        0,
 				HeadYaw:    0,
@@ -396,9 +397,14 @@ func sendChunk(conn base.Connection, x, z int, maxChunksCount int) int {
 			if sendedChunks[key] {
 				continue
 			}
-			chunksToSend = append(chunksToSend, client_packet.PacketOLevelChunkWithLightFake{
-				Data: _CreateChunk(x+i, z+j),
-			})
+
+			ch := chunk_utils.LoadChunk(x+i, z+j)
+			// ch := chunk_utils.LoadChunk(0, 0)
+			if ch != nil {
+				chunksToSend = append(chunksToSend, client_packet.PacketOLevelChunkWithLightFake{
+					Data: chunk_utils.CreateFromNbt(*ch),
+				})
+			}
 			sendedChunks[key] = true
 			conn.Profile().SendedChunks = sendedChunks
 			if len(chunksToSend) >= maxChunksCount {

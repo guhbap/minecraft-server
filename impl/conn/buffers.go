@@ -32,6 +32,15 @@ type ConnBuffer struct {
 	bArray []byte
 }
 
+func (b *ConnBuffer) Write(p []byte) (n int, err error) {
+	b.bArray = append(b.bArray, p...)
+	return len(p), nil
+}
+
+func (b *ConnBuffer) SetIndex(index int32) {
+	b.iIndex = index
+}
+
 func (b *ConnBuffer) String() string {
 	return fmt.Sprintf("Buffer[%d](i: %d, o: %d)%v", b.Len(), b.iIndex, b.oIndex, b.bArray)
 }
@@ -87,8 +96,21 @@ func (b *ConnBuffer) PullByt() byte {
 	return b.pullNext()
 }
 
+func (b *ConnBuffer) Copy() *ConnBuffer {
+	return &ConnBuffer{bArray: b.bArray}
+}
+
+func (b *ConnBuffer) CopyI() ConnBuffer {
+	return ConnBuffer{bArray: b.bArray[b.iIndex:]}
+}
+
 func (b *ConnBuffer) PullI16() int16 {
 	return int16(binary.BigEndian.Uint16(b.pullSize(4)))
+}
+
+func (b *ConnBuffer) PullI24() int32 {
+	buf := b.pullSize(3)
+	return int32(buf[0])<<16 | int32(buf[1])<<8 | int32(buf[2])
 }
 
 func (b *ConnBuffer) PullU16() uint16 {
