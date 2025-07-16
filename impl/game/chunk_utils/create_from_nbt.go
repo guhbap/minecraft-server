@@ -2,42 +2,10 @@ package chunk_utils
 
 import (
 	"bytes"
-	"encoding/hex"
-	"fmt"
 
 	"github.com/Tnze/go-mc/nbt"
 	"github.com/golangmc/minecraft-server/impl/conn"
-	"github.com/golangmc/minecraft-server/impl/game/utils"
 )
-
-func init() {
-	return
-
-	needData := utils.ReadHexFile("testData/levelFuullHeight.hex")
-	// os.WriteFile("testData/levelFuullHeight.bin", needData, 0644)
-
-	needDataBuff := conn.ConnBuffer{}
-	needDataBuff.PushUAS(needData, false)
-
-	needDataNbt := LoadChunk(0, 0)
-	// fmt.Println("needDataNbt", needDataNbt)
-	fmt.Println("--------------------------------")
-	notAirBlocks := CalculateNotAirBlocksNew(4, 9, needDataNbt.Sections[0].BlockStates.Data)
-	fmt.Println("notAirBlocks", notAirBlocks)
-	tBuf := conn.ConnBuffer{}
-	tBuf.PushI16(int16(notAirBlocks))
-	fmt.Println("tBuf", hex.EncodeToString(tBuf.UAS()))
-	// return
-	// ParseChunk(needDataBuff)
-	var hexString string
-	hexString = utils.HexToString(CreateFromNbt(*needDataNbt))
-	if hexString != "" {
-		fmt.Println("hexString", hexString)
-	}
-	res, intt, str := DeepCompareByteArrays(needData, CreateFromNbt(*needDataNbt), 3)
-	fmt.Println("res", res, intt, str)
-
-}
 
 func CreateFromNbt(nbtData ChunkNbt) []byte {
 	buf := conn.ConnBuffer{}

@@ -10,4 +10,4 @@ TODO
 * [ ] фикс спектатора
 * [X] цвета в чате и табе
 * [X] подгрузка мира из файла
-* [ ] использовать https://pkg.go.dev/go.minekube.com/brigodier
+* [ ] использовать https://pkg.go.dev/go.minekube.com/brigodier для парсинга команд

@@ -222,10 +222,6 @@ func CreateFakeDamageType(ids ...string) []client.RegistryEntry {
 	return entries
 }
 
-func ptrInt32(i int32) *int32 {
-	return &i
-}
-
 type PaintingVariant struct {
 	AssetId string `nbt:"asset_id"`
 	Height  int32  `nbt:"height"`

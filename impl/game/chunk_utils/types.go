@@ -25,8 +25,8 @@ type ChunkSectionNbt struct {
 	Y           int8                       `nbt:"Y"`
 	BlockStates ChunkSectionBlockStatesNbt `nbt:"block_states"`
 	Biomes      ChunkSectionBiomesNbt      `nbt:"biomes"`
-	BlockLight  []byte                     `nbt:"BlockLight"` // todo эти поля не используются, надо будет как то решать
-	SkyLight    []byte                     `nbt:"SkyLight"`   // todo эти поля не используются, надо будет как то решать
+	BlockLight  []byte                     `nbt:"BlockLight"`
+	SkyLight    []byte                     `nbt:"SkyLight"`
 }
 type ChunkSectionBlockStatesNbt struct {
 	Palette []ChunkSectionBlocksPaletteNbt `nbt:"palette"`
