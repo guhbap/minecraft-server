@@ -47,7 +47,7 @@ func NewServerInfo(configFileName string) *ServerInfo {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("config file readed", res)
+	// fmt.Println("config file readed", res)
 
 	res.Network = Network{
 		Host: "0.0.0.0",

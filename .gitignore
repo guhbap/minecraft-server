@@ -21,3 +21,4 @@ out
 gen
 latest.log
 tmp/build-errors.log
+world/region/*

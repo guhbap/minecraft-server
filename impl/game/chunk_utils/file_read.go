@@ -29,9 +29,7 @@ func CalculateOffset(x, z int) int {
 
 func LoadChunk(x, z int) *ChunkNbt {
 	offset := CalculateOffset(x, z)
-	fmt.Println("offset", offset)
 	region := fmt.Sprintf("world/region/r.%d.%d.mca", x>>5, z>>5)
-	fmt.Println("region", region)
 	datas, err := os.ReadFile(region)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -47,16 +45,12 @@ func LoadChunk(x, z int) *ChunkNbt {
 	headReader.SkpLen(int32(offset))
 	chunkReader := conn.ConnBuffer{}
 	chunkReader.PushUAS(datas[4*KB:], false)
-	fmt.Println("--------------------------------")
 
 	pos := headReader.PullI24()
-	fmt.Println("pos", pos)
 	if pos == 0 {
 		return nil
 	}
-	fmt.Println("size", headReader.PullByt())
 	si := int32(pos*4*KB - 4*KB)
-	fmt.Println("si", si)
 	chunkReader.SetIndex(si)
 
 	// chunkReader.SkpLen(int32(pos * 4 * KB))
@@ -90,10 +84,16 @@ func LoadChunk(x, z int) *ChunkNbt {
 	// fmt.Println("bytesData", bytesData)
 }
 
-func deepCompareByteArrays(test, real []byte) (bool, int, string) {
+func DeepCompareByteArrays(test, real []byte, skip int) (bool, int, string) {
+	counter := 0
 	for i := 0; i < len(real); i++ {
 		if test[i] != real[i] {
-			return false, i, fmt.Sprintf("test[%d] = 0x%x, real[%d] = 0x%x (0x%x, 0x%x, 0x%x)", i, test[i], i, real[i], test[i], test[i+1], test[i+2])
+			if counter < skip {
+				counter++
+				continue
+			} else {
+				return false, i, fmt.Sprintf("test[%d] = 0x%x, real[%d] = 0x%x (0x%02x, 0x%02x, 0x%02x)", i, test[i], i, real[i], test[i], test[i+1], test[i+2])
+			}
 		}
 	}
 	return true, 0, ""

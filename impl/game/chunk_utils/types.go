@@ -6,6 +6,7 @@ import (
 
 	"github.com/Tnze/go-mc/nbt"
 	"github.com/golangmc/minecraft-server/impl/conn"
+	biomeFinder "github.com/golangmc/minecraft-server/impl/game/registry/biome"
 	blockFinder "github.com/golangmc/minecraft-server/impl/game/registry/block"
 )
 
@@ -70,6 +71,7 @@ func (h *Heightmap) EncodeTo(buf *conn.ConnBuffer) {
 type Pallete struct {
 	Blocks    []int
 	strBlocks []string
+	AirIndex  int
 
 	BitsPerBlock byte
 }
@@ -80,6 +82,9 @@ func NewPallete(blocks []ChunkSectionBlocksPaletteNbt) *Pallete {
 		bl, err := blockFinder.GetBlockID(block.Name, block.Properties)
 		if err != nil {
 			panic(err)
+		}
+		if block.Name == "minecraft:air" {
+			palette.AirIndex = len(palette.Blocks)
 		}
 		palette.Blocks = append(palette.Blocks, bl)
 		palette.strBlocks = append(palette.strBlocks, block.Name)
@@ -100,17 +105,88 @@ func NewPallete(blocks []ChunkSectionBlocksPaletteNbt) *Pallete {
 	return palette
 }
 
-func (p *Pallete) Push(buf *conn.ConnBuffer) {
-	buf.PushByt(p.BitsPerBlock)
+func NewBiomesPallete(biomes []string) *Pallete {
+	palette := &Pallete{}
+	for _, biome := range biomes {
+		palette.Blocks = append(palette.Blocks, biomeFinder.GetBiomeId(biome))
+	}
+	if len(palette.Blocks) == 1 {
+		palette.BitsPerBlock = 0
+	} else if len(palette.Blocks) < 17 {
+		palette.BitsPerBlock = 4
+	} else if len(palette.Blocks) < 33 {
+		palette.BitsPerBlock = 5
+	} else if len(palette.Blocks) < 65 {
+		palette.BitsPerBlock = 6
+	} else if len(palette.Blocks) < 129 {
+		palette.BitsPerBlock = 7
+	} else {
+		panic("not implemented for len(palette.Blocks) = " + strconv.Itoa(len(palette.Blocks)))
+	}
+	return palette
+}
+
+func (p *Pallete) Push(buf *conn.ConnBuffer, isBiome bool) {
 	if p.BitsPerBlock == 0 {
+		buf.PushByt(0)
 		buf.PushVrI(int32(p.Blocks[0]))
 	} else {
+		var typeByte byte
+		blockCount := len(p.Blocks)
+		if isBiome {
+			switch {
+			case blockCount < 3:
+				typeByte = 1
+			case blockCount < 5:
+				typeByte = 2
+			case blockCount < 9:
+				typeByte = 3
+			}
+		}
+		if typeByte == 0 {
+			switch {
+			case blockCount < 17:
+				typeByte = 4
+			case blockCount < 33:
+				typeByte = 5
+			case blockCount < 65:
+				typeByte = 6
+			case blockCount < 129:
+				typeByte = 7
+			}
+		}
+		if typeByte == 0 {
+			panic("not implemented for len(p.Blocks) = " + strconv.Itoa(len(p.Blocks)))
+		}
 
+		buf.PushByt(typeByte)
 		buf.PushVrI(int32(len(p.Blocks)))
 		for _, block := range p.Blocks {
 			buf.PushVrI(int32(block))
 		}
 	}
+
+	// if isBiome {
+	// 	if len(p.Blocks) > 1 && len(p.Blocks) < 3 {
+	// 		buf.PushByt(1)
+	// 		buf.PushVrI(int32(len(p.Blocks)))
+	// 		for _, block := range p.Blocks {
+	// 			buf.PushVrI(int32(block))
+	// 		}
+	// 	} else if len(p.Blocks) > 3 && len(p.Blocks) < 5 {
+	// 		buf.PushByt(2)
+	// 		buf.PushVrI(int32(len(p.Blocks)))
+	// 		for _, block := range p.Blocks {
+	// 			buf.PushVrI(int32(block))
+	// 		}
+	// 	} else if len(p.Blocks) > 5 && len(p.Blocks) < 17 {
+	// 		buf.PushByt(3)
+	// 		buf.PushVrI(int32(len(p.Blocks)))
+	// 		for _, block := range p.Blocks {
+	// 			buf.PushVrI(int32(block))
+	// 		}
+	// 	}
+	// }
 	// if len(p.Blocks) > 1 && len(p.Blocks) < 17 {
 	// 	buf.PushByt(4)
 	// 	buf.PushVrI(int32(len(p.Blocks)))

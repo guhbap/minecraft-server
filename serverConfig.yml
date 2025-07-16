@@ -1,4 +1,4 @@
-allow_unlicensed: false
+allow_unlicensed: true
 port: 25565
 server_motd: "Hello, World!"
 max_players: 200

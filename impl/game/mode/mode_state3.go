@@ -216,7 +216,7 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 			})
 			conn.SendPacket(&client_packet.PacketOPlayerPosition{
 				TpId:     int32(rand.Intn(1000000)),
-				Position: data.PositionF{X: 0, Y: 200, Z: 0},
+				Position: data.PositionF{X: -10, Y: 62, Z: 23},
 				Speed:    data.PositionF{X: 0, Y: 0, Z: 0},
 				Yaw:      0,
 				Pitch:    0,
@@ -262,9 +262,9 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				EntityID:   player.EntityID,
 				EntityUUID: player.UUID,
 				Type:       subtypes.EntityTypesRegistry["minecraft:player"].Index,
-				X:          0,
-				Y:          200,
-				Z:          0,
+				X:          7,
+				Y:          64,
+				Z:          24,
 				Pitch:      0,
 				Yaw:        0,
 				HeadYaw:    0,

@@ -2,11 +2,13 @@ package mode
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/golangmc/minecraft-server/apis/game"
 	"github.com/golangmc/minecraft-server/apis/util"
 	"github.com/golangmc/minecraft-server/impl/base"
 	"github.com/golangmc/minecraft-server/impl/game/ents"
+	"github.com/golangmc/minecraft-server/impl/game/registry/biome"
 	"github.com/golangmc/minecraft-server/impl/prot/client"
 	"github.com/golangmc/minecraft-server/impl/prot/server"
 )
@@ -89,97 +91,8 @@ func HandleStateConfiguration(watcher util.Watcher, join chan base.PlayerAndConn
 		})
 
 		conn.SendPacket(&client.PacketORegistryData{
-			Id: "minecraft:worldgen/biome",
-			Entries: CreateFakeBiome(
-
-				"ocean",
-				"plains",
-				"desert",
-				"mountains",
-				"forest",
-				"taiga",
-				"swamp",
-				"river",
-				"nether_wastes",
-				"the_end",
-				"frozen_ocean",
-				"frozen_river",
-				"snowy_tundra",
-				"snowy_mountains",
-				"mushroom_fields",
-				"mushroom_field_shore",
-				"beach",
-				"desert_hills",
-				"wooded_hills",
-				"taiga_hills",
-				"mountain_edge",
-				"jungle",
-				"jungle_hills",
-				"jungle_edge",
-				"deep_ocean",
-				"stone_shore",
-				"snowy_beach",
-				"birch_forest",
-				"birch_forest_hills",
-				"dark_forest",
-				"snowy_taiga",
-				"snowy_taiga_hills",
-				"giant_tree_taiga",
-				"giant_tree_taiga_hills",
-				"wooded_mountains",
-				"savanna",
-				"savanna_plateau",
-				"badlands",
-				"wooded_badlands_plateau",
-				"badlands_plateau",
-				"small_end_islands",
-				"end_midlands",
-				"end_highlands",
-				"end_barrens",
-				"warm_ocean",
-				"lukewarm_ocean",
-				"cold_ocean",
-				"deep_warm_ocean",
-				"deep_lukewarm_ocean",
-				"deep_cold_ocean",
-				"deep_frozen_ocean",
-				"swamp_hills",
-				"sunflower_plains",
-				"desert_lakes",
-				"gravelly_mountains",
-				"flower_forest",
-				"taiga_mountains",
-				"the_void",
-				"ice_spikes",
-				"modified_jungle",
-				"modified_jungle_edge",
-				"tall_birch_forest",
-				"tall_birch_hills",
-				"dark_forest_hills",
-				"snowy_taiga_mountains",
-				"giant_spruce_taiga",
-				"giant_spruce_taiga_hills",
-				"modified_gravelly_mountains",
-				"shattered_savanna",
-				"shattered_savanna_plateau",
-				"eroded_badlands",
-				"modified_wooded_badlands_plateau",
-				"modified_badlands_plateau",
-				"bamboo_jungle",
-				"bamboo_jungle_hills",
-				"soul_sand_valley",
-				"crimson_forest",
-				"warped_forest",
-				"basalt_deltas",
-				"dripstone_caves",
-				"lush_caves",
-				"meadow",
-				"grove",
-				"snowy_slopes",
-				"snowcapped_peaks",
-				"lofty_peaks",
-				"stony_peaks",
-			),
+			Id:      "minecraft:worldgen/biome",
+			Entries: LoadBiomes(),
 		})
 
 		conn.SendPacket(&client.PacketORegistryData{
@@ -271,28 +184,23 @@ func HandleStateConfiguration(watcher util.Watcher, join chan base.PlayerAndConn
 	})
 }
 
-func CreateFakeBiome(ids ...string) []client.RegistryEntry {
-	dt := Biome{
-		HasPrecipitation: true,
-		Temperature:      0.7,
-		Downfall:         0.8,
-		Effects: BiomeEffects{
-			SkyColor:           7972607,            // Голубой
-			WaterColor:         4159204,            // Сине-зелёный
-			WaterFogColor:      329011,             // Тёмно-синий
-			FogColor:           12638463,           // Белый туман
-			FoliageColor:       ptrInt32(0x6A7039), // Цвет листвы (тёмно-зелёный)
-			GrassColor:         ptrInt32(0x6A7039), // Цвет травы (тёмно-зелёный)
-			GrassColorModifier: "dark_forest",
-		},
-	}
+func LoadBiomes() []client.RegistryEntry {
+
 	entries := []client.RegistryEntry{}
-	for _, id := range ids {
+	for _, bm := range biome.InvertedBiomes {
+		// bm, ok := biome.InvertedBiomes["minecraft:"+id]
+		// if !ok {
+		// 	panic("biome not found: " + id)
+		// }
+		fmt.Println("send biome: ", bm.Name, bm)
 		entries = append(entries, client.RegistryEntry{
-			Id:    "minecraft:" + id,
-			Value: dt,
+			Id:    bm.Name,
+			Value: bm,
 		})
 	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Id < entries[j].Id
+	})
 	return entries
 }
 
@@ -351,22 +259,6 @@ type WolfVariant struct {
 	TameTexture  string `nbt:"tame_texture"`
 	AngryTexture string `nbt:"angry_texture"`
 	Biomes       string `nbt:"biomes"`
-}
-
-type Biome struct {
-	HasPrecipitation bool         `nbt:"has_precipitation"`
-	Temperature      float32      `nbt:"temperature"`
-	Downfall         float32      `nbt:"downfall"`
-	Effects          BiomeEffects `nbt:"effects"`
-}
-type BiomeEffects struct {
-	SkyColor           int32  `nbt:"sky_color"`
-	WaterColor         int32  `nbt:"water_color"`
-	WaterFogColor      int32  `nbt:"water_fog_color"`
-	FogColor           int32  `nbt:"fog_color"`
-	FoliageColor       *int32 `nbt:"foliage_color,omitempty"` // Опционально
-	GrassColor         *int32 `nbt:"grass_color,omitempty"`   // Опционально
-	GrassColorModifier string `nbt:"grass_color_modifier,omitempty"`
 }
 
 type DamageType struct {
