@@ -67,9 +67,6 @@ func CreateFromNbt(nbtData ChunkNbt) []byte {
 		for _, section := range nbtData.Sections[:] {
 			if section.Y != -5 {
 				pushSection(&tmpBuf, section)
-				fmt.Println("--------------------------------")
-				fmt.Println("section.Y", section.Y)
-				fmt.Println("--------------------------------")
 			}
 		}
 		for i, section := range nbtData.Sections[:] {
@@ -87,8 +84,6 @@ func CreateFromNbt(nbtData ChunkNbt) []byte {
 				emptyBlockBitMask |= 1 << int64(i)
 			}
 		}
-
-		fmt.Println("skysLength", len(skys))
 
 		// buf.PushVrI(200)
 		buf.PushVrI(tmpBuf.Len())
@@ -173,11 +168,9 @@ func pushSection(buf *conn.ConnBuffer, section ChunkSectionNbt) {
 	}
 	// Подсчет непустых блоков
 	nonAirCount := 0
-	fmt.Println("bitsPerBlock", bitsPerBlock)
 	blocksPerLong := uint(64 / bitsPerBlock)
 	mask := (1 << bitsPerBlock) - 1 // Маска для извлечения битов
 	airIndex := pallete.AirIndex
-	fmt.Println("airIndex", airIndex)
 
 	tempBuf.PushVrI(int32(len(section.BlockStates.Data)))
 	for _, block := range section.BlockStates.Data {
@@ -208,7 +201,6 @@ func pushSection(buf *conn.ConnBuffer, section ChunkSectionNbt) {
 	// 	buf.PushByt(0xAA)
 	// }
 	buf.PushI16(int16(nonAirCount)) // непонятно нихуя. Сколько блоков надо обновить?
-	fmt.Println("nonAirCount", nonAirCount)
 	buf.PushUAS(tempBuf.UAS(), false)
 
 }
@@ -223,10 +215,8 @@ func (p *SkyLight) Push(buf *conn.ConnBuffer) {
 
 func CalculateNotAirBlocks(bitsPerBlock uint, airIndex int, data []int64) int {
 	nonAirCount := 0
-	fmt.Println("bitsPerBlock", bitsPerBlock)
 	blocksPerLong := uint(64 / bitsPerBlock)
 	mask := (1 << bitsPerBlock) - 1 // Маска для извлечения битов
-	fmt.Println("airIndex", airIndex)
 
 	for _, block := range data {
 		for i := uint(0); i < blocksPerLong; i++ {

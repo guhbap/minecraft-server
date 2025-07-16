@@ -24,6 +24,7 @@ import (
 func HandleState2(watcher util.Watcher, serverInfo *conf.ServerInfo) {
 
 	watcher.SubAs(func(packet *server.PacketILoginStart, conn base.Connection) {
+		fmt.Println("login start")
 		if !serverInfo.AllowUnlicensed {
 
 			conn.CertifyValues(packet.PlayerName)
