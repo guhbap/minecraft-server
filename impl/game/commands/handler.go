@@ -11,6 +11,7 @@ import (
 	"github.com/golangmc/minecraft-server/impl/data/client"
 	client_packet "github.com/golangmc/minecraft-server/impl/prot/client"
 	server_packet "github.com/golangmc/minecraft-server/impl/prot/server"
+	"github.com/golangmc/minecraft-server/impl/prot/subtypes"
 )
 
 func CommandHandler(packet *server_packet.PacketIChatCommand, conn base.Connection) {
@@ -24,7 +25,7 @@ func CommandHandler(packet *server_packet.PacketIChatCommand, conn base.Connecti
 		err := GameModeCommand(args, conn)
 		if err != nil {
 			conn.SendPacket(&client_packet.PacketOSystemChat{
-				Message: client_packet.NbtTextMessage{
+				Message: subtypes.NbtTextMessage{
 					Type:  "text",
 					Text:  err.Error(),
 					Color: "red",
@@ -36,7 +37,7 @@ func CommandHandler(packet *server_packet.PacketIChatCommand, conn base.Connecti
 		err := SpawnEntity(conn, args)
 		if err != nil {
 			conn.SendPacket(&client_packet.PacketOSystemChat{
-				Message: client_packet.NbtTextMessage{
+				Message: subtypes.NbtTextMessage{
 					Type:  "text",
 					Text:  err.Error(),
 					Color: "red",

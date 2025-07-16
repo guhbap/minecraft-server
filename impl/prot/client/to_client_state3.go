@@ -1,9 +1,6 @@
 package client
 
 import (
-	"bytes"
-
-	"github.com/Tnze/go-mc/nbt"
 	"github.com/golangmc/minecraft-server/apis/buff"
 	"github.com/golangmc/minecraft-server/apis/data"
 	"github.com/golangmc/minecraft-server/apis/data/msgs"
@@ -655,7 +652,7 @@ func UPDATE_LATENCY(Latency int32) func(buff.Buffer) {
 }
 func UPDATE_DISPLAY_NAME(DisplayName string) func(buff.Buffer) {
 	return func(writer buff.Buffer) {
-		msg := NbtTextMessage{
+		msg := subtypes.NbtTextMessage{
 			Text:  DisplayName,
 			Type:  "text",
 			Color: "white",
@@ -703,7 +700,7 @@ func (p *PacketOPlayerInfoUpdate) Push(writer buff.Buffer, conn base.Connection)
 }
 
 type PacketOSystemChat struct {
-	Message NbtTextMessage
+	Message subtypes.NbtTextMessage
 	Overlay bool
 }
 
@@ -716,24 +713,6 @@ func (p *PacketOSystemChat) Push(writer buff.Buffer, conn base.Connection) {
 	p.Message.Push(writer)
 	// writer.PushTxt(`[{"text": "A", "color": "red"}, "B", "C"]`)
 	writer.PushBit(p.Overlay)
-}
-
-type NbtTextMessage struct {
-	Type  string           `nbt:"type,omitempty"`
-	Text  string           `nbt:"text,omitempty"`
-	Color string           `nbt:"color,omitempty"`
-	Extra []NbtTextMessage `nbt:"extra,omitempty"`
-}
-
-func (p *NbtTextMessage) Push(writer buff.Buffer) {
-	buf := bytes.NewBuffer(nil)
-	enc := nbt.NewEncoder(buf)
-	enc.NetworkFormat(true)
-	err := enc.Encode(p, "")
-	if err != nil {
-		panic(err)
-	}
-	writer.PushUAS(buf.Bytes(), false)
 }
 
 type PacketOBundle struct {
