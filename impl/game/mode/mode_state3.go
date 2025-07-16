@@ -77,7 +77,11 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 	watcher.SubAs(func(packet *server_packet.PacketIChatCommand, conn base.Connection) {
 		logger.DataF("player %s is sending a chat command: %s", conn.Address(), packet.Command)
 		conn.SendPacket(&client_packet.PacketOSystemChat{
-			Message: packet.Command,
+			Message: client_packet.NbtTextMessage{
+				Type:  "text",
+				Text:  packet.Command,
+				Color: "white",
+			},
 			Overlay: false,
 		})
 		commands.CommandHandler(packet, conn)
@@ -338,7 +342,23 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				},
 			})
 			BroadcastPacket(serverInfo, &client_packet.PacketOSystemChat{
-				Message: fmt.Sprintf("player %s joined the game", conn.Profile().Name),
+				Message: client_packet.NbtTextMessage{
+					Type:  "text",
+					Text:  "player ",
+					Color: "white",
+					Extra: []client_packet.NbtTextMessage{
+						{
+							Type:  "text",
+							Text:  conn.Profile().Name,
+							Color: "green",
+						},
+						{
+							Type:  "text",
+							Text:  " joined the game",
+							Color: "white",
+						},
+					},
+				},
 				Overlay: false,
 			})
 

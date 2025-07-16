@@ -656,7 +656,9 @@ func UPDATE_LATENCY(Latency int32) func(buff.Buffer) {
 func UPDATE_DISPLAY_NAME(DisplayName string) func(buff.Buffer) {
 	return func(writer buff.Buffer) {
 		msg := NbtTextMessage{
-			Text: DisplayName,
+			Text:  DisplayName,
+			Type:  "text",
+			Color: "white",
 		}
 		writer.PushByt(1)
 		msg.Push(writer)
@@ -701,7 +703,7 @@ func (p *PacketOPlayerInfoUpdate) Push(writer buff.Buffer, conn base.Connection)
 }
 
 type PacketOSystemChat struct {
-	Message string
+	Message NbtTextMessage
 	Overlay bool
 }
 
@@ -711,16 +713,16 @@ func (p *PacketOSystemChat) UUID() int32 {
 
 func (p *PacketOSystemChat) Push(writer buff.Buffer, conn base.Connection) {
 
-	message := NbtTextMessage{
-		Text: p.Message,
-	}
-	message.Push(writer)
+	p.Message.Push(writer)
 	// writer.PushTxt(`[{"text": "A", "color": "red"}, "B", "C"]`)
 	writer.PushBit(p.Overlay)
 }
 
 type NbtTextMessage struct {
-	Text string `nbt:"text"`
+	Type  string           `nbt:"type,omitempty"`
+	Text  string           `nbt:"text,omitempty"`
+	Color string           `nbt:"color,omitempty"`
+	Extra []NbtTextMessage `nbt:"extra,omitempty"`
 }
 
 func (p *NbtTextMessage) Push(writer buff.Buffer) {

@@ -24,7 +24,11 @@ func CommandHandler(packet *server_packet.PacketIChatCommand, conn base.Connecti
 		err := GameModeCommand(args, conn)
 		if err != nil {
 			conn.SendPacket(&client_packet.PacketOSystemChat{
-				Message: err.Error(),
+				Message: client_packet.NbtTextMessage{
+					Type:  "text",
+					Text:  err.Error(),
+					Color: "red",
+				},
 				Overlay: false,
 			})
 		}
@@ -32,7 +36,11 @@ func CommandHandler(packet *server_packet.PacketIChatCommand, conn base.Connecti
 		err := SpawnEntity(conn, args)
 		if err != nil {
 			conn.SendPacket(&client_packet.PacketOSystemChat{
-				Message: err.Error(),
+				Message: client_packet.NbtTextMessage{
+					Type:  "text",
+					Text:  err.Error(),
+					Color: "red",
+				},
 				Overlay: false,
 			})
 		}
