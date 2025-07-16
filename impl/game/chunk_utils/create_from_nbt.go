@@ -11,6 +11,7 @@ import (
 )
 
 func init() {
+	return
 
 	needData := utils.ReadHexFile("testData/levelFuullHeight.hex")
 	// os.WriteFile("testData/levelFuullHeight.bin", needData, 0644)

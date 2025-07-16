@@ -152,7 +152,7 @@ func HandleStateConfiguration(watcher util.Watcher, join chan base.PlayerAndConn
 
 		conn.SendPacket(
 			&client.PacketOUpdateTags{
-				RawData: client.UpdateTagsDataRaw,
+				RawData: client.UpdateTagsDataRaw, // TODO: генерировать данные самостоятельно
 			},
 		)
 

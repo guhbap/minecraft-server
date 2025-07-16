@@ -114,33 +114,39 @@ func handleConnect(network *network, conn base.Connection) {
 
 		buf := NewBufferWith(conn.Decrypt(inf[:sze]))
 
-		// decompression
-		// decryption
+		for buf.InI() < buf.Len() {
+			if buf.UAS()[0] == 0xFE { // LEGACY PING
+				break // или continue, если их нужно просто игнорировать
+			}
 
-		if buf.UAS()[0] == 0xFE { // LEGACY PING
-			continue
-		}
+			packetLen := buf.PullVrI()
 
-		packetLen := buf.PullVrI()
+			if buf.Len()-buf.InI() < packetLen {
+				// Возможно, это неполный пакет (не до конца пришёл)
+				break
+			}
 
-		bufI := NewBufferWith(buf.UAS()[buf.InI() : buf.InI()+packetLen])
-		bufO := NewBuffer()
+			packetData := buf.UAS()[buf.InI() : buf.InI()+packetLen]
+			buf.SkpLen(packetLen)
 
-		handleReceive(network, conn, bufI)
+			bufI := NewBufferWith(packetData)
+			bufO := NewBuffer()
 
-		if bufO.Len() > 1 {
-			temp := NewBuffer()
-			temp.PushVrI(bufO.Len())
+			handleReceive(network, conn, bufI)
 
-			comp := NewBuffer()
-			comp.PushUAS(conn.Deflate(bufO.UAS()), false)
+			if bufO.Len() > 1 {
+				temp := NewBuffer()
+				temp.PushVrI(bufO.Len())
 
-			temp.PushUAS(comp.UAS(), false)
+				comp := NewBuffer()
+				comp.PushUAS(conn.Deflate(bufO.UAS()), false)
 
-			_, err := conn.Push(conn.Encrypt(temp.UAS()))
+				temp.PushUAS(comp.UAS(), false)
 
-			if err != nil {
-				network.logger.Fail("Failed to push client bound packet: %v", err)
+				_, err := conn.Push(conn.Encrypt(temp.UAS()))
+				if err != nil {
+					network.logger.Fail("Failed to push client bound packet: %v", err)
+				}
 			}
 		}
 	}
@@ -154,7 +160,7 @@ func handleReceive(network *network, conn base.Connection, bufI buff.Buffer) {
 		network.logger.DataF("unable to decode %v packet with uuid: 0x%02x", conn.GetState(), uuid)
 		return
 	}
-	silentkList := []int32{0x0b, 0x1c, 0x1d, 0x1e, 0x09}
+	silentkList := []int32{} //{0x0b, 0x1c, 0x1d, 0x1e, 0x09}
 
 	if !slices.Contains(silentkList, uuid) {
 		network.logger.DataF("GET packet: 0x%02x %d | %v | %v", packetI.UUID(), uuid, reflect.TypeOf(packetI), conn.GetState())
