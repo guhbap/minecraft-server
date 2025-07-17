@@ -85,63 +85,37 @@ func GameModeCommand(args []string, conn base.Connection) error {
 				FlyingSpeed: 0.05,
 				FieldOfView: 0.1,
 			})
-		properties := make([]client_packet.Property, len(conn.Profile().Properties))
-		for i, prop := range conn.Profile().Properties {
-			properties[i] = client_packet.Property{
-				Name:      prop.Name,
-				Value:     prop.Value,
-				Signature: prop.Signature,
-			}
-		}
-		conn.SendPacket(&client_packet.PacketOPlayerInfoUpdate{
-			Actions: 0x01,
-			Players: []client_packet.PlayerInfoUpdatePlayer{
-				{
-					UUID: conn.Profile().UUID,
-					Actions: []func(buff.Buffer){
-						client_packet.ADD_PLAYER_ACTION(conn.Profile().Name, properties),
+		conn.SendPacket(
+			&client_packet.PacketOPlayerInfoUpdate{
+				Actions: 0x04,
+				Players: []client_packet.PlayerInfoUpdatePlayer{
+					{
+						UUID: conn.Profile().UUID,
+						Actions: []func(buff.Buffer){
+							client_packet.UPDATE_GAME_MODE(3),
+						},
 					},
 				},
-			},
-		})
-
-		conn.SendPacket(&client_packet.PacketOGameEvent{EventID: 3, Data: 3})
-		conn.SendPacket(
-			&client_packet.PacketOPlayerAbilities{
-				Abilities: client.PlayerAbilities{
-					Invulnerable: true,
-					Flying:       true,
-					AllowFlight:  true,
-					InstantBuild: false,
-				},
-				FlyingSpeed: 0.05,
-				FieldOfView: 0.1,
 			})
-		conn.SendPacket(&client_packet.PacketOSetEntityMetadata{
-			EntityID: int32(conn.Profile().EntityID), // todo
-			// Metadata: []byte{0, 0, 32, 255},
-		})
-		conn.SendPacket(&client_packet.PacketOUpdateAttributes{
-			EntityID: int32(conn.Profile().EntityID),
-			Attributes: []client_packet.AttrProperty{
-				{
-					ID:        6,
-					Value:     4.5,
-					Modifiers: []client_packet.ModifierData{},
+		conn.SendPacket(&client_packet.PacketOGameEvent{EventID: 3, Data: 3})
+	} else {
+		conn.SendPacket(
+			&client_packet.PacketOPlayerInfoUpdate{
+				Actions: 0x04,
+				Players: []client_packet.PlayerInfoUpdatePlayer{
+					{
+						UUID: conn.Profile().UUID,
+						Actions: []func(buff.Buffer){
+							client_packet.UPDATE_GAME_MODE(mode),
+						},
+					},
 				},
-				{
-					ID:        9,
-					Value:     3,
-					Modifiers: []client_packet.ModifierData{},
-				},
-			},
+			})
+		conn.SendPacket(&client_packet.PacketOGameEvent{
+			EventID: 3,
+			Data:    float32(mode),
 		})
 	}
-
-	// conn.SendPacket(&client_packet.PacketOGameEvent{
-	// 	EventID: 3,
-	// 	Data:    float32(mode),
-	// })
 	return nil
 }
 
