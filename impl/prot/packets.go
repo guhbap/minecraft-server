@@ -8,6 +8,7 @@ import (
 	"github.com/golangmc/minecraft-server/impl/conf"
 	"github.com/golangmc/minecraft-server/impl/game/mode"
 	"github.com/golangmc/minecraft-server/impl/prot/server"
+	stateplay "github.com/golangmc/minecraft-server/impl/prot/server/statePlay"
 )
 
 type packets struct {
@@ -121,6 +122,9 @@ func createPacketI() map[base.PacketState]map[int32]func() base.PacketI {
 			0x26: func() base.PacketI {
 				return &server.PacketIPlayerAbilities{}
 			},
+			0x27: func() base.PacketI {
+				return &stateplay.PacketIPlayerAction{}
+			},
 			0x28: func() base.PacketI {
 				return &server.PacketIPlayerCommand{}
 			},
@@ -129,6 +133,9 @@ func createPacketI() map[base.PacketState]map[int32]func() base.PacketI {
 			},
 			0x2a: func() base.PacketI {
 				return &server.PacketIPlayerLoaded{}
+			},
+			0x3A: func() base.PacketI {
+				return &stateplay.PacketISwing{}
 			},
 		},
 	}

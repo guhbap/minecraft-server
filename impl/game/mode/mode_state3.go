@@ -21,10 +21,12 @@ import (
 	"github.com/golangmc/minecraft-server/impl/game/chunk_utils"
 	"github.com/golangmc/minecraft-server/impl/game/commands"
 	impl_event "github.com/golangmc/minecraft-server/impl/game/event"
+	block_registry "github.com/golangmc/minecraft-server/impl/game/registry/block"
 
 	client_packet "github.com/golangmc/minecraft-server/impl/prot/client"
-	stateplay "github.com/golangmc/minecraft-server/impl/prot/client/statePlay"
+	c_stateplay "github.com/golangmc/minecraft-server/impl/prot/client/statePlay"
 	server_packet "github.com/golangmc/minecraft-server/impl/prot/server"
+	s_stateplay "github.com/golangmc/minecraft-server/impl/prot/server/statePlay"
 	"github.com/golangmc/minecraft-server/impl/prot/subtypes"
 	"github.com/golangmc/minecraft-server/impl/prot/subtypes/entityMetadata"
 )
@@ -48,6 +50,34 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 
 	watcher.SubAs(func(packet *server_packet.PacketIKeepAlive, conn base.Connection) {
 		logger.DataF("player %s is being kept alive", conn.Address())
+	})
+	watcher.SubAs(func(packet *s_stateplay.PacketISwing, conn base.Connection) {
+		fmt.Println("player is swinging: ", packet.Hand)
+		needHand := c_stateplay.AnimationSwing
+		switch packet.Hand {
+		case s_stateplay.SwingHandOffhand:
+			needHand = c_stateplay.AnimationSwingOffhand
+		case s_stateplay.SwingHandMainHand:
+			needHand = c_stateplay.AnimationSwing
+		}
+
+		BroadcastPacket(serverInfo, &c_stateplay.PacketOAnimate{
+			EntityID:  int32(conn.Profile().EntityID),
+			Animation: needHand,
+		}, conn.Profile().UUID)
+	})
+
+	watcher.SubAs(func(packet *s_stateplay.PacketIPlayerAction, conn base.Connection) {
+		conn.SendPacket(&c_stateplay.PacketOBlockChangedAck{
+			Sequence: packet.Sequence,
+		})
+		if packet.Status == s_stateplay.PlayerActionStatusStartedDigging {
+			newBlockId, _ := block_registry.GetBlockID("minecraft:air", nil)
+			BroadcastPacket(serverInfo, &c_stateplay.PacketOBlockUpdate{
+				Location: packet.Location,
+				BlockId:  int32(newBlockId),
+			})
+		}
 	})
 
 	watcher.SubAs(func(packet *server_packet.PacketIPluginMessage, conn base.Connection) {
@@ -262,7 +292,7 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				},
 			}
 
-			addEntityPacket := &stateplay.PacketOAddEntity{
+			addEntityPacket := &c_stateplay.PacketOAddEntity{
 				EntityID:   player.EntityID,
 				EntityUUID: player.UUID,
 				Type:       subtypes.EntityTypesRegistry["minecraft:player"].Index,
@@ -293,7 +323,7 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				conn.SendPacket(packet)
 				conn.SendPacket(&client_packet.PacketOBundle{})
 
-				packet2, ok := player.OtherData["addEntityPacket"].(*stateplay.PacketOAddEntity)
+				packet2, ok := player.OtherData["addEntityPacket"].(*c_stateplay.PacketOAddEntity)
 				if !ok {
 					continue
 				}
@@ -385,10 +415,10 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				fmt.Println("player quit", conn.Profile().UUID.String())
 				delete(serverInfo.DynamicServerInfo.Online, conn.Profile().UUID.String())
 				delete(serverInfo.DynamicServerInfo.Players, conn.Profile().UUID.String())
-				BroadcastPacket(serverInfo, &stateplay.PacketORemoveEntity{
+				BroadcastPacket(serverInfo, &c_stateplay.PacketORemoveEntity{
 					EntityIDs: []int32{conn.Profile().EntityID},
 				})
-				BroadcastPacket(serverInfo, &stateplay.PacketOPlayerInfoRemove{
+				BroadcastPacket(serverInfo, &c_stateplay.PacketOPlayerInfoRemove{
 					UUIDs: []uuid.UUID{conn.Profile().UUID},
 				})
 			}
@@ -466,7 +496,7 @@ func BroadcastAddPlayer(serverInfo *conf.ServerInfo, player *conf.PlayerData) {
 	if !ok {
 		return
 	}
-	addEntityPacket, ok := player.OtherData["addEntityPacket"].(*stateplay.PacketOAddEntity)
+	addEntityPacket, ok := player.OtherData["addEntityPacket"].(*c_stateplay.PacketOAddEntity)
 	if !ok {
 		return
 	}
