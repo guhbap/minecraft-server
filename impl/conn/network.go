@@ -87,42 +87,45 @@ func (n *network) startListening() error {
 func handleConnect(network *network, conn base.Connection) {
 	network.logger.DataF("New Connection from &6%v", conn.Address())
 
-	var inf []byte
+	var inf = make([]byte, 1024)
+	var leftover []byte // 🔸 буфер для хранения "обрезков"
 
 	for {
-		inf = make([]byte, 1024)
 		sze, err := conn.Pull(inf)
 
 		if err != nil && err.Error() == "EOF" {
-			network.quit <- base.PlayerAndConnection{
-				Player:     nil,
-				Connection: conn,
-			}
-
+			network.quit <- base.PlayerAndConnection{Player: nil, Connection: conn}
 			break
 		}
 
 		if err != nil || sze == 0 {
 			_ = conn.Stop()
-
-			network.quit <- base.PlayerAndConnection{
-				Player:     nil,
-				Connection: conn,
-			}
+			network.quit <- base.PlayerAndConnection{Player: nil, Connection: conn}
 			break
 		}
 
-		buf := NewBufferWith(conn.Decrypt(inf[:sze]))
+		// 🔸 объединяем прошлые остатки и новый приходящий пакет
+		data := append(leftover, conn.Decrypt(inf[:sze])...)
+		buf := NewBufferWith(data)
 
 		for buf.InI() < buf.Len() {
-			if buf.UAS()[0] == 0xFE { // LEGACY PING
-				break // или continue, если их нужно просто игнорировать
+			if buf.UAS()[buf.InI()] == 0xFE {
+				fmt.Println("LEGACY PING")
+				buf.SkpLen(1) // Пропускаем байт LEGACY PING
+				continue
 			}
 
+			startIndex := buf.InI()
+
 			packetLen := buf.PullVrI()
+			if packetLen == 0 {
+				// 🔸 Не смогли прочитать длину — ждём следующую порцию
+				break
+			}
 
 			if buf.Len()-buf.InI() < packetLen {
-				// Возможно, это неполный пакет (не до конца пришёл)
+				// 🔸 Неполный пакет — сохраняем остаток и ждём продолжения
+				leftover = buf.UAS()[startIndex:]
 				break
 			}
 
@@ -148,6 +151,9 @@ func handleConnect(network *network, conn base.Connection) {
 					network.logger.Fail("Failed to push client bound packet: %v", err)
 				}
 			}
+
+			// После успешной обработки очищаем leftover
+			leftover = nil
 		}
 	}
 }
@@ -160,7 +166,10 @@ func handleReceive(network *network, conn base.Connection, bufI buff.Buffer) {
 		network.logger.DataF("unable to decode %v packet with uuid: 0x%02x", conn.GetState(), uuid)
 		return
 	}
-	silentkList := []int32{0x0b, 0x1c, 0x1d, 0x1e, 0x09}
+	silentkList := []int32{
+
+		// } //
+		0x0b, 0x1c, 0x1d, 0x1e, 0x09, 0x29}
 
 	if !slices.Contains(silentkList, uuid) {
 		network.logger.DataF("GET packet: 0x%02x %d | %v | %v", packetI.UUID(), uuid, reflect.TypeOf(packetI), conn.GetState())

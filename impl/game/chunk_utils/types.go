@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/Tnze/go-mc/nbt"
+	"github.com/golangmc/minecraft-server/apis/buff"
 	"github.com/golangmc/minecraft-server/impl/conn"
 	biomeFinder "github.com/golangmc/minecraft-server/impl/game/registry/biome"
 	blockFinder "github.com/golangmc/minecraft-server/impl/game/registry/block"
@@ -78,6 +79,7 @@ type Pallete struct {
 
 func NewPallete(blocks []ChunkSectionBlocksPaletteNbt) *Pallete {
 	palette := &Pallete{}
+	palette.AirIndex = -1
 	for _, block := range blocks {
 		bl, err := blockFinder.GetBlockID(block.Name, block.Properties)
 		if err != nil {
@@ -126,7 +128,7 @@ func NewBiomesPallete(biomes []string) *Pallete {
 	return palette
 }
 
-func (p *Pallete) Push(buf *conn.ConnBuffer, isBiome bool) {
+func (p *Pallete) Push(buf buff.Buffer, isBiome bool) {
 	if p.BitsPerBlock == 0 {
 		buf.PushByt(0)
 		buf.PushVrI(int32(p.Blocks[0]))

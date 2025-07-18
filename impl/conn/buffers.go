@@ -13,23 +13,29 @@ import (
 )
 
 /*
- Language used:
-	- Len = Length
-	- Arr = Array
+	 Language used:
+		- Len = Length
+		- Arr = Array
 
-	- Bit = Boolean
-	- Byt = Byte
-	- Int = int
-	- VrI = VarInt
-	- Srt = Short
-	- Txt = String
+		- Bit = Boolean
+		- Byt = Byte
+		- Int = int
+		- VrI = VarInt
+		- Srt = Short
+		- Txt = String
 */
-
+const maxBufferSize = 1024 * 1024 * 1024 // 10MB
 type ConnBuffer struct {
 	iIndex int32
 	oIndex int32
 
 	bArray []byte
+}
+
+func (b *ConnBuffer) Reset() {
+	b.iIndex = 0
+	b.oIndex = 0
+	b.bArray = make([]byte, 0)
 }
 
 func (b *ConnBuffer) Write(p []byte) (n int, err error) {
@@ -229,7 +235,41 @@ func (b *ConnBuffer) PushF64(data float64) {
 	b.PushI64(int64(math.Float64bits(data)))
 }
 
-func (b *ConnBuffer) PushVrI(data int32) {
+func (b *ConnBuffer) _PushVrI(data int32) {
+	for {
+		temp := data & 0x7F
+		data >>= 7
+
+		if data != 0 {
+			temp |= 0x80
+		}
+
+		b.pushNext(byte(temp))
+
+		if data == 0 {
+			break
+		}
+	}
+}
+func (b *ConnBuffer) PushVrI(value int32) {
+	uvalue := uint32(value)
+	for {
+		temp := byte(uvalue & 0x7F)
+		uvalue >>= 7
+
+		if uvalue != 0 {
+			temp |= 0x80
+		}
+
+		b.pushNext(temp)
+
+		if uvalue == 0 {
+			break
+		}
+	}
+}
+
+func (b *ConnBuffer) _PushVrL(data int64) {
 	for {
 		temp := data & 0x7F
 		data >>= 7
@@ -247,17 +287,18 @@ func (b *ConnBuffer) PushVrI(data int32) {
 }
 
 func (b *ConnBuffer) PushVrL(data int64) {
+	uvalue := uint64(data)
 	for {
-		temp := data & 0x7F
-		data >>= 7
+		temp := byte(uvalue & 0x7F)
+		uvalue >>= 7
 
-		if data != 0 {
+		if uvalue != 0 {
 			temp |= 0x80
 		}
 
 		b.pushNext(byte(temp))
 
-		if data == 0 {
+		if uvalue == 0 {
 			break
 		}
 	}
@@ -319,6 +360,10 @@ func (b *ConnBuffer) pullSize(next int) []byte {
 }
 
 func (b *ConnBuffer) pushNext(bArray ...byte) {
+	if b.oIndex+int32(len(bArray)) > maxBufferSize {
+		panic("buffer overflow at index " + strconv.Itoa(int(b.oIndex)) + " with length " + strconv.Itoa(len(bArray)))
+	}
+
 	b.oIndex += int32(len(bArray))
 	b.bArray = append(b.bArray, bArray...)
 }

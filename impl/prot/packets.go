@@ -90,7 +90,7 @@ func createPacketI() map[base.PacketState]map[int32]func() base.PacketI {
 		},
 		base.PLAY: {
 			0x00: func() base.PacketI {
-				return &server.PacketIBundleDelimiter{}
+				return &server.PacketIAcceptTeleportation{}
 			},
 			0x05: func() base.PacketI {
 				return &server.PacketIChatCommand{}
@@ -118,6 +118,9 @@ func createPacketI() map[base.PacketState]map[int32]func() base.PacketI {
 			},
 			0x1D: func() base.PacketI {
 				return &server.PacketIMovePlayerPosRot{}
+			},
+			0x1F: func() base.PacketI {
+				return &stateplay.PacketIMovePlayerStatusOnly{}
 			},
 			0x26: func() base.PacketI {
 				return &server.PacketIPlayerAbilities{}

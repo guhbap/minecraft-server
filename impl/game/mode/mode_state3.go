@@ -2,6 +2,7 @@ package mode
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"slices"
 	"time"
@@ -16,8 +17,10 @@ import (
 	"github.com/golangmc/minecraft-server/apis/uuid"
 	"github.com/golangmc/minecraft-server/impl/base"
 	"github.com/golangmc/minecraft-server/impl/conf"
+	t_conn "github.com/golangmc/minecraft-server/impl/conn"
 	"github.com/golangmc/minecraft-server/impl/data/values"
 
+	chunkcreator "github.com/golangmc/minecraft-server/impl/game/chunk_creator"
 	"github.com/golangmc/minecraft-server/impl/game/chunk_utils"
 	"github.com/golangmc/minecraft-server/impl/game/commands"
 	impl_event "github.com/golangmc/minecraft-server/impl/game/event"
@@ -29,6 +32,11 @@ import (
 	s_stateplay "github.com/golangmc/minecraft-server/impl/prot/server/statePlay"
 	"github.com/golangmc/minecraft-server/impl/prot/subtypes"
 	"github.com/golangmc/minecraft-server/impl/prot/subtypes/entityMetadata"
+)
+
+const (
+	InGameChunkRadius = 10
+	SpawnChunkRadius  = 2
 )
 
 func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Tasking, join chan base.PlayerAndConnection, quit chan base.PlayerAndConnection, serverInfo *conf.ServerInfo) {
@@ -118,7 +126,17 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 	})
 
 	watcher.SubAs(func(packet *server_packet.PacketIMovePlayerPos, conn base.Connection) {
-		sendChunk(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount)
+		x := int(packet.Position.X / 16)
+		z := int(packet.Position.Z / 16)
+		if calculateDistance(x, z, int(conn.Profile().ChunksCacheCenterX), int(conn.Profile().ChunksCacheCenterZ)) > 8 {
+			conn.SendPacket(&client_packet.PacketOSetChunkCacheCenter{
+				X: int32(x),
+				Z: int32(z),
+			})
+			conn.Profile().ChunksCacheCenterX = int32(x)
+			conn.Profile().ChunksCacheCenterZ = int32(z)
+		}
+		sendChunksInRadius(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount, InGameChunkRadius)
 		if packet.Position.Y < -100 {
 			conn.SendPacket(&client_packet.PacketOPlayerPosition{
 				TpId:     int32(rand.Intn(1000000)),
@@ -173,7 +191,17 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 		}, conn.Profile().UUID)
 	})
 	watcher.SubAs(func(packet *server_packet.PacketIMovePlayerPosRot, conn base.Connection) {
-		sendChunk(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount)
+		x := int(packet.Position.X / 16)
+		z := int(packet.Position.Z / 16)
+		if calculateDistance(x, z, int(conn.Profile().ChunksCacheCenterX), int(conn.Profile().ChunksCacheCenterZ)) > 8 {
+			conn.SendPacket(&client_packet.PacketOSetChunkCacheCenter{
+				X: int32(x),
+				Z: int32(z),
+			})
+			conn.Profile().ChunksCacheCenterX = int32(x)
+			conn.Profile().ChunksCacheCenterZ = int32(z)
+		}
+		sendChunksInRadius(conn, int(packet.Position.X/16), int(packet.Position.Z/16), conn.Profile().MaxChunksCount, InGameChunkRadius)
 		conn.Profile().UpdatePos(packet.Position.X, packet.Position.Y, packet.Position.Z)
 		conn.Profile().UpdateYawPitch(float32(packet.Rotation.AxisX), float32(packet.Rotation.AxisY))
 		BroadcastPacket(serverInfo, &client_packet.PacketOEntityPositionSync{
@@ -196,6 +224,21 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 	})
 
 	watcher.SubAs(func(packet *server_packet.PacketIChatMessage, conn base.Connection) {
+	})
+	watcher.SubAs(func(packet *server_packet.PacketIChunkBatchReceived, conn base.Connection) {
+		fmt.Println("player is receiving chunk batch: ", packet.ChunkOnTick)
+		prof := conn.Profile()
+		if !prof.Spawned {
+			prof.Spawned = true
+			conn.SendPacket(&client_packet.PacketOPlayerPosition{
+				TpId:     int32(rand.Intn(1000000)),
+				Position: data.PositionF{X: 0, Y: 62, Z: 0},
+				Speed:    data.PositionF{X: 0, Y: 0, Z: 0},
+				Yaw:      0,
+				Pitch:    0,
+				Flags:    0,
+			})
+		}
 	})
 
 	go func() {
@@ -248,15 +291,11 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 				WarningBlocks:          5,
 				WarningTime:            15,
 			})
-			conn.SendPacket(&client_packet.PacketOPlayerPosition{
-				TpId:     int32(rand.Intn(1000000)),
-				Position: data.PositionF{X: -10, Y: 62, Z: 23},
-				Speed:    data.PositionF{X: 0, Y: 0, Z: 0},
-				Yaw:      0,
-				Pitch:    0,
-				Flags:    0,
+			conn.SendPacket(&client_packet.PacketOGameEvent{EventID: 13, Data: 0.0})
+			conn.SendPacket(&client_packet.PacketOSetChunkCacheCenter{
+				X: 0,
+				Z: 0,
 			})
-
 			player := conf.PlayerData{
 				UUID:      conn.Profile().UUID,
 				Name:      conn.Profile().Name,
@@ -332,12 +371,7 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 			}
 
 			BroadcastAddPlayer(serverInfo, &player)
-			conn.SendPacket(&client_packet.PacketOGameEvent{EventID: 13, Data: 0.0})
-
-			conn.SendPacket(&client_packet.PacketOSetChunkCacheCenter{
-				X: 0,
-				Z: 0,
-			})
+			sendChunksInRadius(conn, 0, 0, conn.Profile().MaxChunksCount, SpawnChunkRadius)
 
 			ef := entityMetadata.GetLivingEntityFields()
 			ef.Health.Value = float32(20.0)
@@ -403,8 +437,6 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 			// 	Values: []client.PlayerInfo{},
 			// })
 
-			sendChunk(conn, 0, 0, conn.Profile().MaxChunksCount)
-
 		}
 	}()
 
@@ -428,41 +460,82 @@ func HandleState3(watcher util.Watcher, logger *logs.Logging, tasking *task.Task
 
 // var sendedChunks = make(map[string]bool)
 
-func chunkKey(x, z int) string {
-	return fmt.Sprintf("%d:%d", x, z)
+var perlinSetting = chunkcreator.NewPerlinSetting(123)
+
+func chunkKey(x, z int) game.ChunkPos {
+	return game.ChunkPos{X: int32(x), Z: int32(z)}
 }
-func sendChunk(conn base.Connection, x, z int, maxChunksCount int) int {
+
+var (
+	defaultChunkPallete = chunk_utils.NewPallete(
+		[]chunk_utils.ChunkSectionBlocksPaletteNbt{
+			{
+				Name: "minecraft:air",
+			},
+			{
+				Name: "minecraft:grass_block",
+				Properties: map[string]string{
+					"snowy": "false",
+				},
+			},
+		},
+	)
+)
+
+func sendChunksInRadius(conn base.Connection, x, z int, maxChunksCount int, radius int) int {
+	conn.Profile().SendedChunksL.Lock()
 	sendedChunks := conn.Profile().SendedChunks
 	chunksToSend := []client_packet.PacketOLevelChunkWithLightFake{}
-
-	radius := 10
-
 	for i := -radius; i <= radius; i++ {
 		for j := -radius; j <= radius; j++ {
 			// Проверка: находится ли точка внутри круга
 			if i*i+j*j > radius*radius {
 				continue
 			}
-
 			key := chunkKey(x+i, z+j)
 			if sendedChunks[key] {
 				continue
 			}
 
-			ch := chunk_utils.LoadChunk(x+i, z+j)
-			// ch := chunk_utils.LoadChunk(0, 0)
-			if ch != nil {
+			if true {
+				// fmt.Println("sending chunk", x+i, z+j)
+				sch := chunkcreator.SendingChunk{
+					X: x + i,
+					Z: z + j,
+				}
+				for secIndex := 0; secIndex < 24; secIndex++ {
+					section := chunkcreator.CreateEmptySection(defaultChunkPallete)
+					sch.Sections = append(sch.Sections, section)
+					section.Y = secIndex - 4
+				}
+				tmpBuf := t_conn.ConnBuffer{}
+				sch.GeneratePerlin(perlinSetting)
+				// for y := 0; y < 20; y++ {
+				// 	sch.SetBlock(5, y, 7, 1)
+				// }
+				sch.Push(&tmpBuf)
 				chunksToSend = append(chunksToSend, client_packet.PacketOLevelChunkWithLightFake{
-					Data: chunk_utils.CreateFromNbt(*ch),
+					Data: tmpBuf.UAS(),
 				})
+				tmpBuf.Reset()
+
+			} else {
+
+				ch := chunk_utils.LoadChunk(x+i, z+j)
+				// ch := chunk_utils.LoadChunk(0, 0)
+				if ch != nil {
+					chunksToSend = append(chunksToSend, client_packet.PacketOLevelChunkWithLightFake{
+						Data: chunk_utils.CreateFromNbt(*ch),
+					})
+				}
 			}
 			sendedChunks[key] = true
-			conn.Profile().SendedChunks = sendedChunks
 			if len(chunksToSend) >= maxChunksCount {
 				break
 			}
 		}
 	}
+
 	if len(chunksToSend) > 0 {
 		conn.SendPacket(&client_packet.PacketOChunkBatchStart{})
 		for _, chunk := range chunksToSend {
@@ -472,6 +545,9 @@ func sendChunk(conn base.Connection, x, z int, maxChunksCount int) int {
 			BatchSize: int32(len(chunksToSend)),
 		})
 	}
+
+	conn.Profile().SendedChunksL.Unlock()
+
 	return len(chunksToSend)
 }
 
@@ -523,4 +599,8 @@ func BroadcastAddPlayer(serverInfo *conf.ServerInfo, player *conf.PlayerData) {
 		DeltaZ:   0,
 		OnGround: true,
 	}, player.UUID)
+}
+
+func calculateDistance(x1, z1, x2, z2 int) float64 {
+	return math.Sqrt(float64((x1-x2)*(x1-x2) + (z1-z2)*(z1-z2)))
 }

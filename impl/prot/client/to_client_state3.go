@@ -1,6 +1,8 @@
 package client
 
 import (
+	"fmt"
+
 	"github.com/golangmc/minecraft-server/apis/buff"
 	"github.com/golangmc/minecraft-server/apis/data"
 	"github.com/golangmc/minecraft-server/apis/data/msgs"
@@ -602,6 +604,7 @@ func (p *PacketOSetChunkCacheCenter) UUID() int32 {
 }
 
 func (p *PacketOSetChunkCacheCenter) Push(writer buff.Buffer, conn base.Connection) {
+	fmt.Println("SET CHUNK CACHE CENTER", p.X, p.Z)
 	writer.PushVrI(p.X)
 	writer.PushVrI(p.Z)
 }

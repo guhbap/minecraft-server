@@ -168,7 +168,10 @@ func (c *connection) Stop() (err error) {
 }
 
 func (c *connection) SendPacket(packet base.PacketO) {
-	silentkList := []int32{0x20, 0x4D, 0x28, 0x0d, 0x0c}
+	silentkList := []int32{
+
+		// } //
+		0x20, 0x4D, 0x28, 0x0d, 0x0c, 0x22}
 	if !slices.Contains(silentkList, packet.UUID()) {
 		fmt.Printf("sending packet: 0x%02x\n", packet.UUID())
 	}
@@ -181,12 +184,15 @@ func (c *connection) SendPacket(packet base.PacketO) {
 	packet.Push(bufO, c)
 	// fmt.Println("packet: ", hex.EncodeToString(bufO.UAS()))
 
-	temp.PushVrI(bufO.Len())
-	temp.PushUAS(bufO.UAS(), false)
+	temp.PushUAS(bufO.UAS(), true)
 
 	encrypted := c.Encrypt(temp.UAS())
 	_, err := c.tcp.Write(encrypted)
 	if err != nil {
+		err = c.Stop()
+		if err != nil {
+			fmt.Println("error stopping connection: ", err)
+		}
 		fmt.Println("error sending packet: ", err)
 	}
 }

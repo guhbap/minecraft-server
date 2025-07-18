@@ -348,14 +348,16 @@ func (p *PacketIContainerClose) Pull(reader buff.Buffer, conn base.Connection) {
 	p.ContainerID = reader.PullVrI()
 }
 
-type PacketIBundleDelimiter struct {
+type PacketIAcceptTeleportation struct {
+	TeleportID int32
 }
 
-func (p *PacketIBundleDelimiter) UUID() int32 {
+func (p *PacketIAcceptTeleportation) UUID() int32 {
 	return 0x00
 }
 
-func (p *PacketIBundleDelimiter) Pull(reader buff.Buffer, conn base.Connection) {
+func (p *PacketIAcceptTeleportation) Pull(reader buff.Buffer, conn base.Connection) {
+	p.TeleportID = reader.PullVrI()
 }
 
 type PacketIChunkBatchReceived struct {

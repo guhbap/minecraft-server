@@ -1,18 +1,29 @@
 package game
 
 import (
+	"sync"
+
 	"github.com/golangmc/minecraft-server/apis/uuid"
 )
+
+type ChunkPos struct {
+	X int32
+	Z int32
+}
 
 type Profile struct {
 	UUID     uuid.UUID
 	EntityID int32
 	Name     string
 
-	MaxChunksCount int
-	SendedChunks   map[string]bool
-	Properties     []*ProfileProperty
-	OtherData      map[string]any
+	MaxChunksCount     int
+	SendedChunks       map[ChunkPos]bool
+	Spawned            bool
+	SendedChunksL      sync.RWMutex
+	ChunksCacheCenterX int32
+	ChunksCacheCenterZ int32
+	Properties         []*ProfileProperty
+	OtherData          map[string]any
 
 	PosInfo PosInfo
 }

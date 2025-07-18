@@ -27,8 +27,14 @@ import (
 	impl_base "github.com/golangmc/minecraft-server/impl/base"
 
 	apis_event "github.com/golangmc/minecraft-server/apis/game/event"
+	_ "github.com/golangmc/minecraft-server/impl/game/chunk_creator"
 	impl_event "github.com/golangmc/minecraft-server/impl/game/event"
 )
+
+func init() {
+	fmt.Println("init")
+	// worldgen.TestMap3d()
+}
 
 type server struct {
 	message chan system.Message

@@ -45,7 +45,7 @@ func HandleState2(watcher util.Watcher, serverInfo *conf.ServerInfo) {
 				UUID:           uuid.NewUUID(),
 				Name:           packet.PlayerName,
 				MaxChunksCount: 9,
-				SendedChunks:   make(map[string]bool),
+				SendedChunks:   make(map[game.ChunkPos]bool),
 				PosInfo: game.PosInfo{
 					X:     0,
 					Y:     0,
@@ -114,7 +114,7 @@ func HandleState2(watcher util.Watcher, serverInfo *conf.ServerInfo) {
 				UUID:           uuid,
 				Name:           auth.Name,
 				MaxChunksCount: 9,
-				SendedChunks:   make(map[string]bool),
+				SendedChunks:   make(map[game.ChunkPos]bool),
 				PosInfo: game.PosInfo{
 					X:     0,
 					Y:     0,

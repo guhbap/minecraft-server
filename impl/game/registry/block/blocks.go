@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
 )
 
 // BlockState описывает состояние блока в JSON
@@ -33,30 +32,23 @@ type BlockIDFinder struct {
 
 var defaultBlockIDFinder *BlockIDFinder
 
-func GetBlockID(blockName string, properties map[string]string) (int, error) {
-	var err error
-	if defaultBlockIDFinder == nil {
-		defaultBlockIDFinder, err = NewBlockIDFinder("registry/blocks.json")
-		if err != nil {
-			return 0, err
-		}
-	}
-	return defaultBlockIDFinder.GetBlockID(blockName, properties)
-}
-
-// NewBlockIDFinder создает новый экземпляр BlockIDFinder, загружая данные из JSON-файла
-func NewBlockIDFinder(filePath string) (*BlockIDFinder, error) {
-	data, err := os.ReadFile(filePath)
+func init() {
+	data, err := os.ReadFile("registry/blocks.json")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read JSON file: %w", err)
+		panic(err)
 	}
 
 	var blocks BlocksMap
 	if err := json.Unmarshal(data, &blocks); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+		panic(err)
 	}
 
-	return &BlockIDFinder{blocks: blocks}, nil
+	defaultBlockIDFinder = &BlockIDFinder{blocks: blocks}
+}
+
+func GetBlockID(blockName string, properties map[string]string) (int, error) {
+
+	return defaultBlockIDFinder.GetBlockID(blockName, properties)
 }
 
 // GetBlockID возвращает ID блока по его имени и свойствам
@@ -75,7 +67,29 @@ func (f *BlockIDFinder) GetBlockID(blockName string, properties map[string]strin
 
 	// Ищем состояние, соответствующее переданным свойствам
 	for _, state := range block.States {
-		if reflect.DeepEqual(state.Properties, properties) {
+		matches := true
+		// Если свойства nil или пустые, они должны совпадать
+		if (properties == nil && state.Properties != nil) ||
+			(properties != nil && state.Properties == nil) {
+			matches = false
+			continue
+		}
+
+		// Проверяем совпадение количества свойств
+		if len(properties) != len(state.Properties) {
+			matches = false
+			continue
+		}
+
+		// Проверяем совпадение значений свойств
+		for key, value := range properties {
+			if stateValue, exists := state.Properties[key]; !exists || stateValue != value {
+				matches = false
+				break
+			}
+		}
+
+		if matches {
 			return state.ID, nil
 		}
 	}
